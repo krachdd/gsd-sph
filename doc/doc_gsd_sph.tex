@@ -1,0 +1,334 @@
+%% GSD-SPH Module Documentation
+%% Compile with: pdflatex doc_gsd_sph.tex
+
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[top=2.2cm,bottom=2.2cm,left=2.5cm,right=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{array}
+
+\setlength{\parskip}{3pt}
+\titlespacing*{\section}{0pt}{10pt}{3pt}
+\titlespacing*{\subsection}{0pt}{7pt}{2pt}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+\lstdefinestyle{python}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue},
+  stringstyle=\color{orange!70!black},
+  commentstyle=\color{gray}\itshape,
+  breaklines=true,
+  frame=single,
+  framesep=3pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  aboveskip=4pt,
+  belowskip=4pt,
+  showstringspaces=false,
+}
+
+\lstdefinestyle{bash}{
+  language=bash,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray}\itshape,
+  breaklines=true,
+  frame=single,
+  framesep=3pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  aboveskip=4pt,
+  belowskip=4pt,
+}
+
+\title{\textbf{GSD-SPH: Extended GSD File Format for SPH Simulations}\\[4pt]
+       \large Module Documentation \quad \texttt{gsd-sph} v3.4.2}
+\author{David Krach\\[2pt]
+        Institute of Applied Mechanics (MIB), University of Stuttgart\\
+        \href{mailto:david.krach@mib.uni-stuttgart.de}%
+             {david.krach@mib.uni-stuttgart.de}}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Overview}
+
+\texttt{gsd-sph} is a specialised fork of the
+\href{https://github.com/glotzerlab/gsd}{GSD library (v3.4.2)} developed by
+the Glotzer Group at the University of Michigan.  It extends the HOOMD schema
+with the particle fields required by the Smoothed Particle Hydrodynamics (SPH)
+solver implemented in \texttt{hoomd-sph3}.
+
+The General Simulation Data (GSD) format stores simulation trajectories as a
+sequence of \emph{frames} in a compact binary file, providing $O(1)$ random
+access to any individual frame regardless of file size.  The format is split
+into two independent layers:
+
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{File layer} (\texttt{gsd.fl}): A thin C wrapper
+        (\texttt{gsd.c} / \texttt{gsd.h}) responsible for creating, opening,
+        and reading or writing arbitrary named binary data chunks.  This layer
+        is \emph{entirely unmodified} in \texttt{gsd-sph}.
+  \item \textbf{HOOMD schema} (\texttt{gsd.hoomd}): A Python API that
+        interprets file-layer chunks as typed simulation data---positions,
+        velocities, topology, and so on.  This is the \emph{only layer
+        modified} in \texttt{gsd-sph}: eight SPH-specific particle fields are
+        added and five HOOMD-only fields unused by SPH are removed from the
+        schema defaults.
+\end{itemize}
+
+All SPH extensions are therefore isolated in a single file (\texttt{gsd/hoomd.py}),
+which keeps future upstream merges straightforward.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Extended Particle Data Schema}
+
+The class \texttt{gsd.hoomd.ParticleData} is extended with eight additional
+fields (Table~\ref{tab:fields}).  Fields unused by SPH (\texttt{orientation},
+\texttt{angmom}, \texttt{charge}, \texttt{diameter}, \texttt{moment\_inertia})
+are removed from the schema defaults to keep output files compact.
+The standard HOOMD fields retained are: \texttt{position}~$(N,3)$,
+\texttt{velocity}~$(N,3)$, \texttt{mass}~$(N,)$, \texttt{typeid}~$(N,)$,
+\texttt{body}~$(N,)$, \texttt{image}~$(N,3)$, and \texttt{types}.
+
+\begin{table}[h]
+\centering
+\caption{SPH-specific fields added to \texttt{gsd.hoomd.ParticleData}.}
+\label{tab:fields}
+\small
+\begin{tabular}{@{}lllp{7.5cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Shape} & \textbf{dtype} & \textbf{Physical meaning}\\
+\midrule
+\texttt{slength}    & $(N,)$   & float32 & Smoothing length $h_i$; sets kernel cutoff $r_\mathrm{cut} = \kappa\,h_i$\\
+\texttt{density}    & $(N,)$   & float32 & SPH density $\rho_i$; updated via summation or continuity equation\\
+\texttt{pressure}   & $(N,)$   & float32 & Pressure $p_i$; derived from $\rho_i$ via the equation of state\\
+\texttt{energy}     & $(N,)$   & float32 & Specific internal energy $e_i$\\
+\texttt{auxiliary1} & $(N, 3)$ & float32 & Vector field 1 -- e.g.\ fictitious velocity (TV schemes)\\
+\texttt{auxiliary2} & $(N, 3)$ & float32 & Vector field 2 -- e.g.\ solid boundary normals\\
+\texttt{auxiliary3} & $(N, 3)$ & float32 & Vector field 3 -- e.g.\ fluid--fluid interface normals\\
+\texttt{auxiliary4} & $(N, 3)$ & float32 & Vector field 4 -- e.g.\ surface-tension force density\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Relation to the SPH Solver (\texttt{hoomd/sph})}
+
+The SPH solver resides in
+\texttt{hoomd-sph3/dependencies/hoomd-blue/hoomd/sph}.
+It is structured as a set of C++ classes compiled with HOOMD-blue and exposed
+to Python via PyBind11.  GSD files serve as the primary I/O format: the
+simulation writes one frame per saved time step, and post-processing scripts
+read those frames for analysis or visualisation.
+
+\subsection{Data flow}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{0.46\linewidth}@{\hspace{1cm}}p{0.46\linewidth}@{}}
+\toprule
+\textbf{Write path (simulation)} & \textbf{Read path (post-processing)}\\
+\midrule
+HOOMD simulation state is advanced by the \texttt{Integrator} (sph).
+At each logged step, a \texttt{gsd.hoomd.Frame} is populated and written via
+\texttt{HOOMDTrajectory.append(frame)}.
+Only fields that differ from the initial frame or the schema default are
+written, keeping file sizes small.
+&
+A GSD file is opened with \texttt{gsd.hoomd.open(\ldots, 'r')}.
+Frames are accessed by index or iterated in order.
+Missing fields are transparently filled in from frame~0 or from schema
+defaults, so every frame exposes the full \texttt{ParticleData} interface.
+Analysis scripts and VTK conversion tools (\texttt{spfgsd2vtu.py},
+\texttt{tpfgsd2vtu.py}) consume the result.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Solver components and their GSD field usage}
+
+Table~\ref{tab:usage} maps the main solver components to the GSD fields they
+read and write.
+
+\begin{table}[h]
+\centering
+\caption{GSD field usage by solver component.}
+\label{tab:usage}
+\small
+\begin{tabular}{@{}p{3.2cm}lp{3.2cm}p{3.2cm}@{}}
+\toprule
+\textbf{Component} & \textbf{File} & \textbf{Reads} & \textbf{Writes / updates}\\
+\midrule
+Force kernels\newline (\texttt{SinglePhaseFlow},\newline \texttt{TwoPhaseFlow})
+  & \texttt{SinglePhaseFlow.cc}
+  & \texttt{position}, \texttt{velocity}, \texttt{mass}, \texttt{slength}, \texttt{density}
+  & \texttt{density}, \texttt{pressure}, \texttt{energy}, \texttt{auxiliary1--4}\\[4pt]
+Integration methods\newline (\texttt{VelocityVerlet},\newline \texttt{KickDriftKickTV})
+  & \texttt{methods/methods.py}
+  & \texttt{position}, \texttt{velocity}, forces
+  & \texttt{position}, \texttt{velocity}\\[4pt]
+Equation of state\newline (\texttt{Tait}, \texttt{Linear})
+  & \texttt{eos.py},\newline \texttt{StateEquations.h}
+  & \texttt{density}
+  & \texttt{pressure}\\[4pt]
+Compute properties\newline (\texttt{SinglePhaseFlow\-BasicProperties})
+  & \texttt{compute.py}
+  & \texttt{velocity}, \texttt{density}
+  & \texttt{log/} entries (kinetic energy, mean density, \ldots)\\[4pt]
+Smoothing length helper\newline (\texttt{set\_max\_sl})
+  & \texttt{sph\_helper.py}
+  & \texttt{slength}
+  & Neighbor-list cutoff $r_\mathrm{cut}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Physics encoded in the GSD fields}
+
+\textbf{Force computation.}
+At each time step the SPH force kernels loop over all particle pairs $(i,j)$
+within the neighbor-list cutoff $r_{ij} < \kappa\,h_i$.  The momentum equation
+\[
+  \rho_i\,\frac{\mathrm{d}\mathbf{v}_i}{\mathrm{d}t}
+  = -\sum_j m_j \!\left(\frac{p_i}{\rho_i^2} + \frac{p_j}{\rho_j^2}
+    + \Pi_{ij}\right)\nabla_i W_{ij}
+    + \mathbf{g}
+\]
+is evaluated from the stored \texttt{pressure}, \texttt{density}, and
+\texttt{slength} fields.  The artificial viscosity term $\Pi_{ij}$ (activated
+optionally) uses \texttt{velocity} and \texttt{slength}.
+
+\textbf{Density update.}  Two schemes are supported:
+\begin{itemize}[itemsep=1pt]
+  \item \emph{Summation:} $\rho_i = \sum_j m_j\,W(r_{ij}, h_i)$  --- writes
+        \texttt{density} directly.
+  \item \emph{Continuity:} $\dot\rho_i = \rho_i \sum_j
+        (\mathbf{v}_i - \mathbf{v}_j)\cdot\nabla_i W_{ij}$ --- integrates
+        \texttt{density} in the time-stepper.
+\end{itemize}
+
+\textbf{Equation of state.}  \texttt{pressure} is derived from \texttt{density}
+each step via one of:
+\begin{align*}
+  \text{Tait:}\quad   & p_i = \frac{c_0^2\,\rho_0}{\gamma}
+    \!\left[\!\left(\frac{\rho_i}{\rho_0}\right)^{\!\gamma} - 1\right] + p_\mathrm{bg},\\
+  \text{Linear:}\quad & p_i = B\,(\rho_i - \rho_0).
+\end{align*}
+
+\textbf{Time integration.}
+\texttt{VelocityVerlet} advances \texttt{position} and \texttt{velocity} with
+a standard two-step Velocity Verlet scheme.  \texttt{KickDriftKickTV} uses a
+Kick-Drift-Kick decomposition with Total Variation limiting, storing
+intermediate velocity values in \texttt{auxiliary1}.
+
+\textbf{Auxiliary fields in two-phase flow.}
+When \texttt{TwoPhaseFlow} is used, the auxiliary fields carry interface
+geometry: \texttt{auxiliary2} stores solid boundary normals, \texttt{auxiliary3}
+stores fluid--fluid interface normals used for surface-tension force evaluation,
+and \texttt{auxiliary4} stores the resulting surface-tension force density.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Usage}
+
+\subsection{Writing an initial configuration}
+
+\begin{lstlisting}[style=python]
+import gsd.hoomd
+import numpy as np
+
+N = 500
+frame = gsd.hoomd.Frame()
+frame.configuration.box     = [1.0, 1.0, 0.0, 0.0, 0.0, 0.0]  # 2-D box
+frame.particles.N            = N
+frame.particles.types        = ['fluid', 'solid']
+frame.particles.typeid       = np.zeros(N, dtype=np.uint32)   # all fluid
+frame.particles.position     = np.random.rand(N, 3).astype(np.float32)
+frame.particles.velocity     = np.zeros((N, 3), dtype=np.float32)
+frame.particles.mass         = np.full(N, 1e-3, dtype=np.float32)
+frame.particles.slength      = np.full(N, 0.04, dtype=np.float32)
+frame.particles.density      = np.full(N, 1000.0, dtype=np.float32)
+frame.particles.pressure     = np.zeros(N, dtype=np.float32)
+frame.particles.energy       = np.zeros(N, dtype=np.float32)
+
+with gsd.hoomd.open('initial.gsd', 'w') as traj:
+    traj.append(frame)
+\end{lstlisting}
+
+\subsection{Reading a trajectory for post-processing}
+
+\begin{lstlisting}[style=python]
+import gsd.hoomd
+
+with gsd.hoomd.open('trajectory.gsd', 'r') as traj:
+    print(f'{len(traj)} frames')
+
+    for frame in traj:
+        t    = frame.configuration.step
+        pos  = frame.particles.position    # (N, 3) float32
+        vel  = frame.particles.velocity    # (N, 3) float32
+        rho  = frame.particles.density     # (N,)   float32
+        p    = frame.particles.pressure    # (N,)   float32
+        h    = frame.particles.slength     # (N,)   float32
+        aux1 = frame.particles.auxiliary1  # (N, 3) float32 -- e.g. fictitious v
+
+    # Random access by index
+    last = traj[-1]
+    first = traj[0]
+\end{lstlisting}
+
+\subsection{Building the module}
+
+The C extension (\texttt{gsd.fl}) must be compiled before use.  The required
+conda environment is defined in the parent \texttt{hoomd-sph3} repository.
+
+\begin{lstlisting}[style=bash]
+cd gsd-3.4.2
+mkdir build && cd build
+cmake ..
+make
+# install the Python package into the active environment
+pip install -e ../..
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{File Structure}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+\textbf{File} & \textbf{Role}\\
+\midrule
+\texttt{gsd/gsd.c}, \texttt{gsd/gsd.h}
+  & C file layer (unmodified upstream). Handles raw binary chunk I/O.\\
+\texttt{gsd/fl.pyx}
+  & Cython bindings that expose the C file layer as \texttt{gsd.fl}.\\
+\texttt{gsd/hoomd.py}
+  & \textbf{SPH-extended Python schema API.} The only file modified in
+    \texttt{gsd-sph}: adds SPH particle fields and removes unused HOOMD fields.\\
+\texttt{gsd/pygsd.py}
+  & Pure-Python read-only GSD reader (no C compilation required).\\
+\texttt{gsd/\_\_main\_\_.py}
+  & Command-line interface (\texttt{python -m gsd read trajectory.gsd}).\\
+\texttt{gsd/version.py}
+  & Package version string (\texttt{gsd.version.version}).\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}
