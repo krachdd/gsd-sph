@@ -29,7 +29,7 @@ extern "C"
         /// Unsigned 32-bit integer.
         GSD_TYPE_UINT32,
 
-        /// Unsigned 53-bit integer.
+        /// Unsigned 64-bit integer.
         GSD_TYPE_UINT64,
 
         /// Signed 8-bit integer.

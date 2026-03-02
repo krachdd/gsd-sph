@@ -20,72 +20,69 @@ API to specify the initial condition for a **HOOMD-blue** simulation or analyze 
 
 ## HOOMD examples
 
-Create a hoomd gsd file.
+Create a hoomd gsd file:
 ```python
->>> s = gsd.hoomd.Frame()
->>> s.particles.N = 4
->>> s.particles.types = ['A', 'B']
->>> s.particles.typeid = [0,0,1,1]
->>> s.particles.position = [[0,0,0],[1,1,1], [-1,-1,-1], [1,-1,-1]]
->>> s.configuration.box = [3, 3, 3, 0, 0, 0]
->>> traj = gsd.hoomd.open(name='test.gsd', mode='w')
->>> traj.append(s)
+import gsd.hoomd
+
+s = gsd.hoomd.Frame()
+s.particles.N = 4
+s.particles.types = ['A', 'B']
+s.particles.typeid = [0, 0, 1, 1]
+s.particles.position = [[0, 0, 0], [1, 1, 1], [-1, -1, -1], [1, -1, -1]]
+s.configuration.box = [3, 3, 3, 0, 0, 0]
+
+with gsd.hoomd.open(name='test.gsd', mode='w') as traj:
+    traj.append(s)
 ```
 
 Append frames to a gsd file:
 ```python
->>> def create_frame(i):
-...     s = gsd.hoomd.Frame();
-...     s.configuration.step = i;
-...     s.particles.N = 4+i;
-...     s.particles.position = numpy.random.random(size=(4+i,3))
-...     return s;
->>> with gsd.hoomd.open('test.gsd', 'a') as t:
-...     t.extend( (create_frame(i) for i in range(10)) )
-...     print(len(t))
-11
+import numpy
+
+def create_frame(i):
+    s = gsd.hoomd.Frame()
+    s.configuration.step = i
+    s.particles.N = 4 + i
+    s.particles.position = numpy.random.random(size=(4 + i, 3))
+    return s
+
+with gsd.hoomd.open('test.gsd', 'a') as t:
+    t.extend(create_frame(i) for i in range(10))
+    print(len(t))  # 11
 ```
 
 Randomly index frames:
 ```python
->>> with gsd.hoomd.open('test.gsd', 'r') as t:
-...     frame = t[5]
-...     print(frame.configuration.step)
-4
-...     print(frame.particles.N)
-8
-...     print(frame.particles.position)
-[[ 0.56993282  0.42243481  0.5502916 ]
- [ 0.36892486  0.38167036  0.27310368]
- [ 0.04739023  0.13603486  0.196539  ]
- [ 0.120232    0.91591144  0.99463677]
- [ 0.79806316  0.16991436  0.15228257]
- [ 0.13724308  0.14253527  0.02505   ]
- [ 0.39287439  0.82519054  0.01613089]
- [ 0.23150323  0.95167434  0.7715748 ]]
+with gsd.hoomd.open('test.gsd', 'r') as t:
+    frame = t[5]
+    print(frame.configuration.step)   # 4
+    print(frame.particles.N)          # 8
+    print(frame.particles.position)
 ```
 
 Slice frames:
 ```python
->>> with gsd.hoomd.open('test.gsd', 'r') as t:
-...     for s in t[5:-2]:
-...         print(s.configuration.step, end=' ')
-4 5 6 7
+with gsd.hoomd.open('test.gsd', 'r') as t:
+    for s in t[5:-2]:
+        print(s.configuration.step, end=' ')
+# 4 5 6 7
 ```
 
 ## File layer examples
 
 ```python
+import numpy
+
 with gsd.fl.open(name='file.gsd', mode='w') as f:
-    f.write_chunk(name='position', data=numpy.array([[1,2,3],[4,5,6]], dtype=numpy.float32));
-    f.write_chunk(name='angle', data=numpy.array([0, 1], dtype=numpy.float32));
-    f.write_chunk(name='box', data=numpy.array([10, 10, 10], dtype=numpy.float32));
+    f.write_chunk(name='position', data=numpy.array([[1, 2, 3], [4, 5, 6]], dtype=numpy.float32))
+    f.write_chunk(name='angle', data=numpy.array([0, 1], dtype=numpy.float32))
+    f.write_chunk(name='box', data=numpy.array([10, 10, 10], dtype=numpy.float32))
     f.end_frame()
 ```
 
 ```python
 with gsd.fl.open(name='file.gsd', mode='r') as f:
-    for i in range(1,f.nframes):
-        position = f.read_chunk(frame=i, name='position');
-        do_something(position);
+    for i in range(1, f.nframes):
+        position = f.read_chunk(frame=i, name='position')
+        do_something(position)
 ```

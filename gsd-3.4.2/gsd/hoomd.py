@@ -1,20 +1,29 @@
 # Copyright (c) 2016-2024 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
-"""Read and write HOOMD schema GSD files.
+"""Read and write HOOMD schema GSD files extended for SPH simulations.
 
 :py:mod:`gsd.hoomd` reads and writes GSD files with the ``hoomd`` schema.
+This version is extended for use with the SPH solver in ``hoomd-sph3``:
+additional particle fields (``slength``, ``density``, ``pressure``, ``energy``,
+``auxiliary1``–``auxiliary4``) are added to `ParticleData`, and fields unused
+by SPH (``orientation``, ``angmom``, ``charge``, ``diameter``,
+``moment_inertia``) are removed from the schema defaults.
+
+Classes:
 
 * `HOOMDTrajectory` - Read and write hoomd schema GSD files.
 * `Frame` - Store the state of a single frame.
 
   * `ConfigurationData` - Store configuration data in a frame.
-  * `ParticleData` - Store particle data in a frame.
-  * `BondData` - Store topology data in a frame.
+  * `ParticleData` - Store particle data in a frame (SPH-extended).
+  * `BondData` - Store bond topology data in a frame.
+  * `ConstraintData` - Store distance constraint data in a frame.
+
+Functions:
 
 * `open` - Open a hoomd schema GSD file.
-* `read_log` - Read log from a hoomd schema GSD file into a dict of time-series
-  arrays.
+* `read_log` - Read logged quantities into a dict of time-series arrays.
 
 See Also:
     See :ref:`hoomd-examples` for full examples.
@@ -45,18 +54,19 @@ logger = logging.getLogger('gsd.hoomd')
 class ConfigurationData:
     """Store configuration data.
 
-    Use the `Frame.configuration` attribute of a to access the configuration.
+    Access via the `Frame.configuration` attribute.
 
     Attributes:
         step (int): Time step of this frame (:chunk:`configuration/step`).
 
-        dimensions (int): Number of dimensions
+        dimensions (int): Number of spatial dimensions
             (:chunk:`configuration/dimensions`). When not set explicitly,
-            dimensions will default to different values based on the value of
-            :math:`L_z` in `box`. When :math:`L_z = 0` dimensions will default
-            to 2, otherwise 3. User set values always take precedence.
+            the value is inferred from `box`: if :math:`L_z = 0` the default
+            is 2, otherwise 3. User-set values always take precedence.
 
-
+        box ((6,) `numpy.ndarray` of ``numpy.float32``): Simulation box
+            parameters ``[lx, ly, lz, xy, xz, yz]``
+            (:chunk:`configuration/box`).
     """
 
     _default_value = OrderedDict()
@@ -108,17 +118,14 @@ class ConfigurationData:
 
 
 class ParticleData:
-    """Store particle data chunks.
+    """Store particle data chunks (SPH-extended).
 
-    Use the `Frame.particles` attribute of a to access the particles.
+    Access via the `Frame.particles` attribute.
 
-    Instances resulting from file read operations will always store array
-    quantities in `numpy.ndarray` objects of the defined types. User created
-    frames may provide input data that can be converted to a `numpy.ndarray`.
-
-    See Also:
-        `hoomd.State` for a full description of how HOOMD interprets this
-        data.
+    Instances resulting from file read operations always store array quantities
+    as `numpy.ndarray` objects of the types listed below. User-created frames
+    may supply any array-like that can be converted to the appropriate
+    `numpy.ndarray`.
 
     Attributes:
         N (int): Number of particles in the frame (:chunk:`particles/N`).
@@ -129,32 +136,41 @@ class ParticleData:
         position ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
             Particle position (:chunk:`particles/position`).
 
-        orientation ((*N*, 4) `numpy.ndarray` of ``numpy.float32``):
-            Particle orientation. (:chunk:`particles/orientation`).
-
         typeid ((*N*, ) `numpy.ndarray` of ``numpy.uint32``):
             Particle type id (:chunk:`particles/typeid`).
 
         mass ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
             Particle mass (:chunk:`particles/mass`).
 
-        charge ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
-            Particle charge (:chunk:`particles/charge`).
-
-        diameter ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
-            Particle diameter (:chunk:`particles/diameter`).
-
         body ((*N*, ) `numpy.ndarray` of ``numpy.int32``):
             Particle body (:chunk:`particles/body`).
-
-        moment_inertia ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
-            Particle moment of inertia (:chunk:`particles/moment_inertia`).
 
         velocity ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
             Particle velocity (:chunk:`particles/velocity`).
 
-        angmom ((*N*, 4) `numpy.ndarray` of ``numpy.float32``):
-            Particle angular momentum (:chunk:`particles/angmom`).
+        slength ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+            Particle smoothing length (:chunk:`particles/slength`).
+
+        density ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+            Particle density (:chunk:`particles/density`).
+
+        pressure ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+            Particle pressure (:chunk:`particles/pressure`).
+
+        energy ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+            Particle energy (:chunk:`particles/energy`).
+
+        auxiliary1 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+            Auxiliary vector field 1 (:chunk:`particles/auxiliary1`).
+
+        auxiliary2 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+            Auxiliary vector field 2 (:chunk:`particles/auxiliary2`).
+
+        auxiliary3 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+            Auxiliary vector field 3 (:chunk:`particles/auxiliary3`).
+
+        auxiliary4 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+            Auxiliary vector field 4 (:chunk:`particles/auxiliary4`).
 
         image ((*N*, 3) `numpy.ndarray` of ``numpy.int32``):
             Particle image (:chunk:`particles/image`).
@@ -190,14 +206,14 @@ class ParticleData:
         self.mass = None
         self.body = None
         self.velocity = None
-        self.slength = None;
-        self.density = None;
-        self.pressure = None;
-        self.energy = None;
-        self.auxiliary1 = None;
-        self.auxiliary2 = None;
-        self.auxiliary3 = None;
-        self.auxiliary4 = None;
+        self.slength = None
+        self.density = None
+        self.pressure = None
+        self.energy = None
+        self.auxiliary1 = None
+        self.auxiliary2 = None
+        self.auxiliary3 = None
+        self.auxiliary4 = None
         self.image = None
         self.type_shapes = None
 
@@ -235,29 +251,29 @@ class ParticleData:
             self.velocity = self.velocity.reshape([self.N, 3])
         
         if self.slength is not None:
-            self.slength = numpy.ascontiguousarray(self.slength, dtype=numpy.float32);
+            self.slength = numpy.ascontiguousarray(self.slength, dtype=numpy.float32)
             self.slength = self.slength.reshape([self.N])
         if self.density is not None:
-            self.density = numpy.ascontiguousarray(self.density, dtype=numpy.float32);
+            self.density = numpy.ascontiguousarray(self.density, dtype=numpy.float32)
             self.density = self.density.reshape([self.N])
         if self.pressure is not None:
-            self.pressure = numpy.ascontiguousarray(self.pressure, dtype=numpy.float32);
+            self.pressure = numpy.ascontiguousarray(self.pressure, dtype=numpy.float32)
             self.pressure = self.pressure.reshape([self.N])
         if self.energy is not None:
-            self.energy = numpy.ascontiguousarray(self.energy, dtype=numpy.float32);
+            self.energy = numpy.ascontiguousarray(self.energy, dtype=numpy.float32)
             self.energy = self.energy.reshape([self.N])
         if self.auxiliary1 is not None:
-            self.auxiliary1 = numpy.ascontiguousarray(self.auxiliary1, dtype=numpy.float32);
-            self.auxiliary1 = self.auxiliary1.reshape([self.N, 3]);
+            self.auxiliary1 = numpy.ascontiguousarray(self.auxiliary1, dtype=numpy.float32)
+            self.auxiliary1 = self.auxiliary1.reshape([self.N, 3])
         if self.auxiliary2 is not None:
-            self.auxiliary2 = numpy.ascontiguousarray(self.auxiliary2, dtype=numpy.float32);
-            self.auxiliary2 = self.auxiliary2.reshape([self.N, 3]);
+            self.auxiliary2 = numpy.ascontiguousarray(self.auxiliary2, dtype=numpy.float32)
+            self.auxiliary2 = self.auxiliary2.reshape([self.N, 3])
         if self.auxiliary3 is not None:
-            self.auxiliary3 = numpy.ascontiguousarray(self.auxiliary3, dtype=numpy.float32);
-            self.auxiliary3 = self.auxiliary3.reshape([self.N, 3]);
+            self.auxiliary3 = numpy.ascontiguousarray(self.auxiliary3, dtype=numpy.float32)
+            self.auxiliary3 = self.auxiliary3.reshape([self.N, 3])
         if self.auxiliary4 is not None:
-            self.auxiliary4 = numpy.ascontiguousarray(self.auxiliary4, dtype=numpy.float32);
-            self.auxiliary4 = self.auxiliary4.reshape([self.N, 3]);
+            self.auxiliary4 = numpy.ascontiguousarray(self.auxiliary4, dtype=numpy.float32)
+            self.auxiliary4 = self.auxiliary4.reshape([self.N, 3])
 
         if self.image is not None:
             self.image = numpy.ascontiguousarray(self.image, dtype=numpy.int32)
@@ -419,26 +435,23 @@ class Frame:
     """System state at one point in time.
 
     Attributes:
-        configuration (`ConfigurationData`): Configuration data.
+        configuration (`ConfigurationData`): Simulation box and time step.
 
-        particles (`ParticleData`): Particles.
+        particles (`ParticleData`): Per-particle fields (position, velocity,
+            SPH fields, etc.).
 
-        bonds (`BondData`): Bonds.
+        bonds (`BondData`): Bond topology (M=2).
 
-        angles (`BondData`): Angles.
-
-        dihedrals (`BondData`): Dihedrals.
-
-        impropers (`BondData`): Impropers.
-
-        pairs (`BondData`): Special pair.
+        pairs (`BondData`): Special pair topology (M=2).
 
         constraints (`ConstraintData`): Distance constraints.
 
-        state (dict): State data.
+        state (dict): In-memory scratch space for caller use. **Not written
+            to disk.**
 
-        log (dict): Logged data (values must be `numpy.ndarray` or
-            `array_like`)
+        log (dict): Logged scalar or array quantities written to disk under
+            the ``log/`` namespace. Values must be `numpy.ndarray` or
+            array-like.
     """
 
     def __init__(self):
@@ -471,8 +484,6 @@ class _HOOMDTrajectoryIterable:
 
     def __next__(self):
         return self._trajectory[next(self._indices_iterator)]
-
-    next = __next__  # Python 2.7 compatibility
 
     def __iter__(self):
         return type(self)(self._trajectory, self._indices)

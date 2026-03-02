@@ -201,7 +201,6 @@ class GSDFile:
         """
         if self.__is_open:
             logger.info('closing file: ' + str(self.__file))
-            self.__handle = None
             self.__index = None
             self.__namelist = None
             self.__is_open = False
