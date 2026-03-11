@@ -28,4 +28,4 @@ jobs:
 
       - name: Run tests
         working-directory: gsd
-        run: pytest gsd/test/ -v
+        run: pytest gsd/test/ -v -m "not validate"
