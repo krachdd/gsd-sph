@@ -191,10 +191,10 @@ class ParticleData:
     _default_value['density'] = numpy.float32(0.0)
     _default_value['pressure'] = numpy.float32(0.0)
     _default_value['energy'] = numpy.float32(0.0)
-    _default_value['auxiliary1'] = numpy.array([0,0,0], dtype=numpy.float32)
-    _default_value['auxiliary2'] = numpy.array([0,0,0], dtype=numpy.float32)
-    _default_value['auxiliary3'] = numpy.array([0,0,0], dtype=numpy.float32)
-    _default_value['auxiliary4'] = numpy.array([0,0,0], dtype=numpy.float32)
+    _default_value['auxiliary1'] = numpy.array([0, 0, 0], dtype=numpy.float32)
+    _default_value['auxiliary2'] = numpy.array([0, 0, 0], dtype=numpy.float32)
+    _default_value['auxiliary3'] = numpy.array([0, 0, 0], dtype=numpy.float32)
+    _default_value['auxiliary4'] = numpy.array([0, 0, 0], dtype=numpy.float32)
     _default_value['image'] = numpy.array([0, 0, 0], dtype=numpy.int32)
     _default_value['type_shapes'] = [{}]
 

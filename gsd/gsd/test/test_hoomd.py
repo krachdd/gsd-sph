@@ -73,9 +73,6 @@ def test_defaults(tmp_path, open_mode):
     frame = gsd.hoomd.Frame()
     frame.particles.N = 2
     frame.bonds.N = 3
-    frame.angles.N = 4
-    frame.dihedrals.N = 5
-    frame.impropers.N = 6
     frame.constraints.N = 4
     frame.pairs.N = 7
 
@@ -102,33 +99,43 @@ def test_defaults(tmp_path, open_mode):
             s.particles.mass, numpy.array([1, 1], dtype=numpy.float32)
         )
         numpy.testing.assert_array_equal(
-            s.particles.diameter, numpy.array([1, 1], dtype=numpy.float32)
-        )
-        numpy.testing.assert_array_equal(
             s.particles.body, numpy.array([-1, -1], dtype=numpy.int32)
-        )
-        numpy.testing.assert_array_equal(
-            s.particles.charge, numpy.array([0, 0], dtype=numpy.float32)
-        )
-        numpy.testing.assert_array_equal(
-            s.particles.moment_inertia,
-            numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
             s.particles.position,
             numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
-            s.particles.orientation,
-            numpy.array([[1, 0, 0, 0], [1, 0, 0, 0]], dtype=numpy.float32),
-        )
-        numpy.testing.assert_array_equal(
             s.particles.velocity,
             numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
-            s.particles.angmom,
-            numpy.array([[0, 0, 0, 0], [0, 0, 0, 0]], dtype=numpy.float32),
+            s.particles.slength, numpy.array([1, 1], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.density, numpy.array([0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.pressure, numpy.array([0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.energy, numpy.array([0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary1,
+            numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary2,
+            numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary3,
+            numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary4,
+            numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
             s.particles.image, numpy.array([[0, 0, 0], [0, 0, 0]], dtype=numpy.int32)
@@ -141,51 +148,6 @@ def test_defaults(tmp_path, open_mode):
         )
         numpy.testing.assert_array_equal(
             s.bonds.group, numpy.array([[0, 0], [0, 0], [0, 0]], dtype=numpy.uint32)
-        )
-
-        assert s.angles.N == 4
-        assert s.angles.types == []
-        numpy.testing.assert_array_equal(
-            s.angles.typeid, numpy.array([0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.angles.group,
-            numpy.array(
-                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.uint32
-            ),
-        )
-
-        assert s.dihedrals.N == 5
-        assert s.dihedrals.types == []
-        numpy.testing.assert_array_equal(
-            s.dihedrals.typeid, numpy.array([0, 0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.dihedrals.group,
-            numpy.array(
-                [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-                dtype=numpy.uint32,
-            ),
-        )
-
-        assert s.impropers.N == 6
-        assert s.impropers.types == []
-        numpy.testing.assert_array_equal(
-            s.impropers.typeid, numpy.array([0, 0, 0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.impropers.group,
-            numpy.array(
-                [
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                ],
-                dtype=numpy.uint32,
-            ),
         )
 
         assert s.constraints.N == 4
@@ -224,35 +186,23 @@ def make_nondefault_frame():
     ]
     frame0.particles.typeid = [1, 2]
     frame0.particles.mass = [2, 3]
-    frame0.particles.diameter = [3, 4]
     frame0.particles.body = [10, 20]
-    frame0.particles.charge = [0.5, 0.25]
-    frame0.particles.moment_inertia = [[1, 2, 3], [3, 2, 1]]
     frame0.particles.position = [[0.1, 0.2, 0.3], [-1.0, -2.0, -3.0]]
-    frame0.particles.orientation = [[1, 0.1, 0.2, 0.3], [0, -1.0, -2.0, -3.0]]
     frame0.particles.velocity = [[1.1, 2.2, 3.3], [-3.3, -2.2, -1.1]]
-    frame0.particles.angmom = [[1, 1.1, 2.2, 3.3], [-1, -3.3, -2.2, -1.1]]
+    frame0.particles.slength = [2.0, 3.0]
+    frame0.particles.density = [1.5, 2.5]
+    frame0.particles.pressure = [0.5, 0.75]
+    frame0.particles.energy = [10.0, 20.0]
+    frame0.particles.auxiliary1 = [[1, 2, 3], [4, 5, 6]]
+    frame0.particles.auxiliary2 = [[1, 0, 0], [0, 1, 0]]
+    frame0.particles.auxiliary3 = [[0, 1, 0], [0, 0, 1]]
+    frame0.particles.auxiliary4 = [[-1, 0, 0], [0, -1, 0]]
     frame0.particles.image = [[10, 20, 30], [5, 6, 7]]
 
     frame0.bonds.N = 1
     frame0.bonds.types = ['bondA', 'bondB']
     frame0.bonds.typeid = [1]
     frame0.bonds.group = [[0, 1]]
-
-    frame0.angles.N = 1
-    frame0.angles.typeid = [2]
-    frame0.angles.types = ['angleA', 'angleB']
-    frame0.angles.group = [[0, 1, 0]]
-
-    frame0.dihedrals.N = 1
-    frame0.dihedrals.typeid = [3]
-    frame0.dihedrals.types = ['dihedralA', 'dihedralB']
-    frame0.dihedrals.group = [[0, 1, 1, 0]]
-
-    frame0.impropers.N = 1
-    frame0.impropers.typeid = [4]
-    frame0.impropers.types = ['improperA', 'improperB']
-    frame0.impropers.group = [[1, 0, 0, 1]]
 
     frame0.constraints.N = 1
     frame0.constraints.value = [1.1]
@@ -279,42 +229,26 @@ def assert_frames_equal(s, frame0, check_position=True, check_step=True):
     assert s.particles.type_shapes == frame0.particles.type_shapes
     numpy.testing.assert_array_equal(s.particles.typeid, frame0.particles.typeid)
     numpy.testing.assert_array_equal(s.particles.mass, frame0.particles.mass)
-    numpy.testing.assert_array_equal(s.particles.diameter, frame0.particles.diameter)
     numpy.testing.assert_array_equal(s.particles.body, frame0.particles.body)
-    numpy.testing.assert_array_equal(s.particles.charge, frame0.particles.charge)
-    numpy.testing.assert_array_equal(
-        s.particles.moment_inertia, frame0.particles.moment_inertia
-    )
     if check_position:
         numpy.testing.assert_array_equal(
             s.particles.position, frame0.particles.position
         )
-    numpy.testing.assert_array_equal(
-        s.particles.orientation, frame0.particles.orientation
-    )
     numpy.testing.assert_array_equal(s.particles.velocity, frame0.particles.velocity)
-    numpy.testing.assert_array_equal(s.particles.angmom, frame0.particles.angmom)
+    numpy.testing.assert_array_equal(s.particles.slength, frame0.particles.slength)
+    numpy.testing.assert_array_equal(s.particles.density, frame0.particles.density)
+    numpy.testing.assert_array_equal(s.particles.pressure, frame0.particles.pressure)
+    numpy.testing.assert_array_equal(s.particles.energy, frame0.particles.energy)
+    numpy.testing.assert_array_equal(s.particles.auxiliary1, frame0.particles.auxiliary1)
+    numpy.testing.assert_array_equal(s.particles.auxiliary2, frame0.particles.auxiliary2)
+    numpy.testing.assert_array_equal(s.particles.auxiliary3, frame0.particles.auxiliary3)
+    numpy.testing.assert_array_equal(s.particles.auxiliary4, frame0.particles.auxiliary4)
     numpy.testing.assert_array_equal(s.particles.image, frame0.particles.image)
 
     assert s.bonds.N == frame0.bonds.N
     assert s.bonds.types == frame0.bonds.types
     numpy.testing.assert_array_equal(s.bonds.typeid, frame0.bonds.typeid)
     numpy.testing.assert_array_equal(s.bonds.group, frame0.bonds.group)
-
-    assert s.angles.N == frame0.angles.N
-    assert s.angles.types == frame0.angles.types
-    numpy.testing.assert_array_equal(s.angles.typeid, frame0.angles.typeid)
-    numpy.testing.assert_array_equal(s.angles.group, frame0.angles.group)
-
-    assert s.dihedrals.N == frame0.dihedrals.N
-    assert s.dihedrals.types == frame0.dihedrals.types
-    numpy.testing.assert_array_equal(s.dihedrals.typeid, frame0.dihedrals.typeid)
-    numpy.testing.assert_array_equal(s.dihedrals.group, frame0.dihedrals.group)
-
-    assert s.impropers.N == frame0.impropers.N
-    assert s.impropers.types == frame0.impropers.types
-    numpy.testing.assert_array_equal(s.impropers.typeid, frame0.impropers.typeid)
-    numpy.testing.assert_array_equal(s.impropers.group, frame0.impropers.group)
 
     assert s.constraints.N == frame0.constraints.N
     numpy.testing.assert_array_equal(s.constraints.value, frame0.constraints.value)
@@ -334,9 +268,6 @@ def test_fallback(tmp_path, open_mode):
     frame1.particles.N = 2
     frame1.particles.position = [[-2, -1, 0], [1, 3.0, 0.5]]
     frame1.bonds.N = None
-    frame1.angles.N = None
-    frame1.dihedrals.N = None
-    frame1.impropers.N = None
     frame1.constraints.N = None
     frame1.pairs.N = None
 
@@ -348,9 +279,6 @@ def test_fallback(tmp_path, open_mode):
         {'type': 'Ellipsoid', 'a': 7.0, 'b': 5.0, 'c': 3.0},
     ]
     frame2.bonds.N = 3
-    frame2.angles.N = 4
-    frame2.dihedrals.N = 5
-    frame2.impropers.N = 6
     frame2.constraints.N = 4
     frame2.pairs.N = 7
 
@@ -388,37 +316,43 @@ def test_fallback(tmp_path, open_mode):
             s.particles.mass, numpy.array([1, 1, 1], dtype=numpy.float32)
         )
         numpy.testing.assert_array_equal(
-            s.particles.diameter, numpy.array([1, 1, 1], dtype=numpy.float32)
-        )
-        numpy.testing.assert_array_equal(
-            s.particles.body, numpy.array([-1, -1, -1], dtype=numpy.float32)
-        )
-        numpy.testing.assert_array_equal(
-            s.particles.charge, numpy.array([0, 0, 0], dtype=numpy.float32)
-        )
-        numpy.testing.assert_array_equal(
-            s.particles.moment_inertia,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            s.particles.body, numpy.array([-1, -1, -1], dtype=numpy.int32)
         )
         numpy.testing.assert_array_equal(
             s.particles.position,
             numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
-            s.particles.orientation,
-            numpy.array(
-                [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]], dtype=numpy.float32
-            ),
-        )
-        numpy.testing.assert_array_equal(
             s.particles.velocity,
             numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
-            s.particles.angmom,
-            numpy.array(
-                [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], dtype=numpy.float32
-            ),
+            s.particles.slength, numpy.array([1, 1, 1], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.density, numpy.array([0, 0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.pressure, numpy.array([0, 0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.energy, numpy.array([0, 0, 0], dtype=numpy.float32)
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary1,
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary2,
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary3,
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+        )
+        numpy.testing.assert_array_equal(
+            s.particles.auxiliary4,
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
         )
         numpy.testing.assert_array_equal(
             s.particles.image,
@@ -432,51 +366,6 @@ def test_fallback(tmp_path, open_mode):
         )
         numpy.testing.assert_array_equal(
             s.bonds.group, numpy.array([[0, 0], [0, 0], [0, 0]], dtype=numpy.uint32)
-        )
-
-        assert s.angles.N == 4
-        assert s.angles.types == frame0.angles.types
-        numpy.testing.assert_array_equal(
-            s.angles.typeid, numpy.array([0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.angles.group,
-            numpy.array(
-                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.uint32
-            ),
-        )
-
-        assert s.dihedrals.N == 5
-        assert s.dihedrals.types == frame0.dihedrals.types
-        numpy.testing.assert_array_equal(
-            s.dihedrals.typeid, numpy.array([0, 0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.dihedrals.group,
-            numpy.array(
-                [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-                dtype=numpy.uint32,
-            ),
-        )
-
-        assert s.impropers.N == 6
-        assert s.impropers.types == frame0.impropers.types
-        numpy.testing.assert_array_equal(
-            s.impropers.typeid, numpy.array([0, 0, 0, 0, 0, 0], dtype=numpy.uint32)
-        )
-        numpy.testing.assert_array_equal(
-            s.impropers.group,
-            numpy.array(
-                [
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                ],
-                dtype=numpy.uint32,
-            ),
         )
 
         assert s.constraints.N == 4
@@ -509,9 +398,6 @@ def test_fallback_to_frame0(tmp_path, open_mode):
     frame1.configuration.step = 200000
     frame1.particles.N = None
     frame1.bonds.N = None
-    frame1.angles.N = None
-    frame1.dihedrals.N = None
-    frame1.impropers.N = None
     frame1.constraints.N = None
     frame1.pairs.N = None
 
@@ -545,35 +431,23 @@ def test_no_fallback(tmp_path, open_mode):
     frame1.particles.typeid = [0] * frame0.particles.N
     frame1.particles.type_shapes = [{}]
     frame1.particles.mass = [1.0] * frame0.particles.N
-    frame1.particles.charge = [0.0] * frame0.particles.N
-    frame1.particles.diameter = [1.0] * frame0.particles.N
     frame1.particles.body = [-1] * frame0.particles.N
-    frame1.particles.moment_inertia = [[0, 0, 0]] * frame0.particles.N
     frame1.particles.position = [[0, 0, 0]] * frame0.particles.N
-    frame1.particles.orientation = [[1, 0, 0, 0]] * frame0.particles.N
     frame1.particles.velocity = [[0, 0, 0]] * frame0.particles.N
-    frame1.particles.angmom = [[0, 0, 0, 0]] * frame0.particles.N
+    frame1.particles.slength = [1.0] * frame0.particles.N
+    frame1.particles.density = [0.0] * frame0.particles.N
+    frame1.particles.pressure = [0.0] * frame0.particles.N
+    frame1.particles.energy = [0.0] * frame0.particles.N
+    frame1.particles.auxiliary1 = [[0, 0, 0]] * frame0.particles.N
+    frame1.particles.auxiliary2 = [[0, 0, 0]] * frame0.particles.N
+    frame1.particles.auxiliary3 = [[0, 0, 0]] * frame0.particles.N
+    frame1.particles.auxiliary4 = [[0, 0, 0]] * frame0.particles.N
     frame1.particles.image = [[0, 0, 0]] * frame0.particles.N
 
     frame1.bonds.N = frame0.bonds.N
     frame1.bonds.types = ['A']
     frame1.bonds.typeid = [0] * frame0.bonds.N
     frame1.bonds.group = [[0, 0]] * frame0.bonds.N
-
-    frame1.angles.N = frame0.angles.N
-    frame1.angles.types = ['A']
-    frame1.angles.typeid = [0] * frame0.angles.N
-    frame1.angles.group = [[0, 0, 0]] * frame0.angles.N
-
-    frame1.dihedrals.N = frame0.dihedrals.N
-    frame1.dihedrals.types = ['A']
-    frame1.dihedrals.typeid = [0] * frame0.dihedrals.N
-    frame1.dihedrals.group = [[0, 0, 0, 0]] * frame0.dihedrals.N
-
-    frame1.impropers.N = frame0.impropers.N
-    frame1.impropers.types = ['A']
-    frame1.impropers.typeid = [0] * frame0.impropers.N
-    frame1.impropers.group = [[0, 0, 0, 0]] * frame0.impropers.N
 
     frame1.constraints.N = frame0.constraints.N
     frame1.constraints.value = [0] * frame0.constraints.N
@@ -856,7 +730,7 @@ def test_pickle(tmp_path):
 
 
 @pytest.mark.parametrize(
-    'container', ['particles', 'bonds', 'angles', 'dihedrals', 'impropers', 'pairs']
+    'container', ['particles', 'bonds', 'pairs']
 )
 def test_no_duplicate_types(tmp_path, container):
     """Test that duplicate types raise an error."""
@@ -1018,20 +892,26 @@ def test_initial_frame_copy(tmp_path, open_mode):
         assert not frame_1.particles.typeid.flags.writeable
         assert frame_1.particles.mass is initial.particles.mass
         assert not frame_1.particles.mass.flags.writeable
-        assert frame_1.particles.diameter is initial.particles.diameter
-        assert not frame_1.particles.diameter.flags.writeable
         assert frame_1.particles.body is initial.particles.body
         assert not frame_1.particles.body.flags.writeable
-        assert frame_1.particles.charge is initial.particles.charge
-        assert not frame_1.particles.charge.flags.writeable
-        assert frame_1.particles.moment_inertia is initial.particles.moment_inertia
-        assert not frame_1.particles.moment_inertia.flags.writeable
-        assert frame_1.particles.orientation is initial.particles.orientation
-        assert not frame_1.particles.orientation.flags.writeable
         assert frame_1.particles.velocity is initial.particles.velocity
         assert not frame_1.particles.velocity.flags.writeable
-        assert frame_1.particles.angmom is initial.particles.angmom
-        assert not frame_1.particles.angmom.flags.writeable
+        assert frame_1.particles.slength is initial.particles.slength
+        assert not frame_1.particles.slength.flags.writeable
+        assert frame_1.particles.density is initial.particles.density
+        assert not frame_1.particles.density.flags.writeable
+        assert frame_1.particles.pressure is initial.particles.pressure
+        assert not frame_1.particles.pressure.flags.writeable
+        assert frame_1.particles.energy is initial.particles.energy
+        assert not frame_1.particles.energy.flags.writeable
+        assert frame_1.particles.auxiliary1 is initial.particles.auxiliary1
+        assert not frame_1.particles.auxiliary1.flags.writeable
+        assert frame_1.particles.auxiliary2 is initial.particles.auxiliary2
+        assert not frame_1.particles.auxiliary2.flags.writeable
+        assert frame_1.particles.auxiliary3 is initial.particles.auxiliary3
+        assert not frame_1.particles.auxiliary3.flags.writeable
+        assert frame_1.particles.auxiliary4 is initial.particles.auxiliary4
+        assert not frame_1.particles.auxiliary4.flags.writeable
         assert frame_1.particles.image is initial.particles.image
         assert not frame_1.particles.image.flags.writeable
 
@@ -1040,24 +920,6 @@ def test_initial_frame_copy(tmp_path, open_mode):
         assert frame_1.bonds.group is initial.bonds.group
         assert not frame_1.bonds.typeid.flags.writeable
         assert not frame_1.bonds.group.flags.writeable
-
-        assert frame_1.angles.types is not initial.angles.types
-        assert frame_1.angles.typeid is initial.angles.typeid
-        assert frame_1.angles.group is initial.angles.group
-        assert not frame_1.angles.typeid.flags.writeable
-        assert not frame_1.angles.group.flags.writeable
-
-        assert frame_1.dihedrals.types is not initial.dihedrals.types
-        assert frame_1.dihedrals.typeid is initial.dihedrals.typeid
-        assert frame_1.dihedrals.group is initial.dihedrals.group
-        assert not frame_1.dihedrals.typeid.flags.writeable
-        assert not frame_1.dihedrals.group.flags.writeable
-
-        assert frame_1.impropers.types is not initial.impropers.types
-        assert frame_1.impropers.typeid is initial.impropers.typeid
-        assert frame_1.impropers.group is initial.impropers.group
-        assert not frame_1.impropers.typeid.flags.writeable
-        assert not frame_1.impropers.group.flags.writeable
 
         assert frame_1.constraints.value is initial.constraints.value
         assert frame_1.constraints.group is initial.constraints.group

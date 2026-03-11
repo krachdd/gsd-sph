@@ -1,4 +1,4 @@
-name: Build
+name: Build and Test
 
 on:
   push:
@@ -17,8 +17,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install build dependencies
-        run: pip install cython numpy>=2.0.0
+        run: pip install cython "numpy>=2.0.0"
 
       - name: Build
-        working-directory: gsd-3.4.2
+        working-directory: gsd
         run: pip install .
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run tests
+        working-directory: gsd
+        run: pytest gsd/test/ -v

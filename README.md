@@ -1,5 +1,7 @@
 # General Simulation Data Format for SPH Solver
 
+[![Build and Test](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml/badge.svg)](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml)
+
 **Version:** 3.4.2 (based on [GSD by Glotzer Group](https://github.com/glotzerlab/gsd))
 
 A subproject of [hoomd-sph3](https://www.mib.uni-stuttgart.de/institute/team/Krach/)
@@ -69,7 +71,7 @@ The conda environment required for this project is defined in the parent
 `hoomd-sph3` repository.
 
 ```bash
-cd gsd-3.4.2
+cd gsd
 mkdir build && cd build
 cmake ..
 make
@@ -78,7 +80,7 @@ make
 After building, install the Python package into the active environment:
 
 ```bash
-pip install -e gsd-3.4.2/
+pip install -e gsd/
 ```
 
 ---
