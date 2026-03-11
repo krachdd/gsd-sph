@@ -5,7 +5,7 @@
 
 import numpy
 from Cython.Build import cythonize
-from setuptools import setup
+from setuptools import find_packages, setup
 from setuptools.extension import Extension
 
 extensions = cythonize(
@@ -20,4 +20,4 @@ extensions = cythonize(
     compiler_directives={'language_level': 3},
 )
 
-setup(ext_modules=extensions)
+setup(packages=find_packages(), ext_modules=extensions)
