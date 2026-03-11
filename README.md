@@ -1,6 +1,7 @@
 # General Simulation Data Format for SPH Solver
 
 [![Build and Test](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml/badge.svg)](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml)
+[![Release V1.0](https://img.shields.io/badge/release-V1.0-blue)](https://github.com/krachdd/gsd-sph/releases/tag/v1.0)
 
 **Version:** 3.4.2 (based on [GSD by Glotzer Group](https://github.com/glotzerlab/gsd))
 
