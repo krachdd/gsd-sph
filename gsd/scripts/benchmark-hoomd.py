@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 """Benchmark GSD HOOMD file read/write."""
@@ -10,9 +10,9 @@ import sys
 import time
 from subprocess import PIPE, call
 
+import gsd.fl
 import numpy
 
-import gsd.fl
 import gsd.hoomd
 import gsd.pygsd
 
@@ -84,7 +84,7 @@ def read_random_file(file, nframes, nframes_read, N, position, orientation):
 def compute_nframes(N, size):
     """Compute the number of frames to write to the file."""
     bytes_per_frame = (3 + 4) * 4 * N
-    return int(math.ceil(size / bytes_per_frame))
+    return math.ceil(size / bytes_per_frame)
 
 
 def compute_actual_size(N, nframes):

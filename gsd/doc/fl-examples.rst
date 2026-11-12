@@ -1,4 +1,4 @@
-.. Copyright (c) 2016-2024 The Regents of the University of Michigan
+.. Copyright (c) 2016-2026 The Regents of the University of Michigan
 .. Part of GSD, released under the BSD 2-Clause License.
 
 .. _fl-examples:
@@ -171,6 +171,7 @@ Open a file in read/write mode
                     schema_version=[1,0])
     f.write_chunk(name='double', data=numpy.array([1,2,3,4], dtype=numpy.float64));
     f.end_frame()
+    f.flush()
     f.nframes
     f.read_chunk(frame=0, name='double')
 
@@ -200,6 +201,7 @@ Store string chunks
                     schema_version=[1,0])
     f.write_chunk(name='string', data="This is a string")
     f.end_frame()
+    f.flush()
     r = f.read_chunk(frame=0, name='string')
     r
     f.close()

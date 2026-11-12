@@ -10,3 +10,7 @@ gsd.egg-info
 __pycache__
 devdoc
 build/
+html
+# pixi environments
+.pixi/*
+!.pixi/config.toml

@@ -3,7 +3,7 @@
 [![Build and Test](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml/badge.svg)](https://github.com/krachdd/gsd-sph/actions/workflows/build.yml)
 [![Release V1.0](https://img.shields.io/badge/release-V1.0-blue)](https://github.com/krachdd/gsd-sph/releases/tag/v1.0)
 
-**Version:** 3.4.2 (based on [GSD by Glotzer Group](https://github.com/glotzerlab/gsd))
+**Version:** 5.0.1 (based on [GSD by Glotzer Group](https://github.com/glotzerlab/gsd))
 
 A subproject of [hoomd-sph3](https://www.mib.uni-stuttgart.de/institute/team/Krach/)
 that extends the upstream GSD library with the particle fields required by the SPH

@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 """Read and write HOOMD schema GSD files extended for SPH simulations.
@@ -6,24 +6,21 @@
 :py:mod:`gsd.hoomd` reads and writes GSD files with the ``hoomd`` schema.
 This version is extended for use with the SPH solver in ``hoomd-sph3``:
 additional particle fields (``slength``, ``density``, ``pressure``, ``energy``,
-``auxiliary1``–``auxiliary4``) are added to `ParticleData`, and fields unused
+``auxiliary1``-``auxiliary4``) are added to `ParticleData`, and fields unused
 by SPH (``orientation``, ``angmom``, ``charge``, ``diameter``,
-``moment_inertia``) are removed from the schema defaults.
-
-Classes:
+``moment_inertia``) as well as angles, dihedrals and impropers are removed
+from the schema.
 
 * `HOOMDTrajectory` - Read and write hoomd schema GSD files.
 * `Frame` - Store the state of a single frame.
 
   * `ConfigurationData` - Store configuration data in a frame.
-  * `ParticleData` - Store particle data in a frame (SPH-extended).
-  * `BondData` - Store bond topology data in a frame.
-  * `ConstraintData` - Store distance constraint data in a frame.
-
-Functions:
+  * `ParticleData` - Store particle data in a frame.
+  * `BondData` - Store topology data in a frame.
 
 * `open` - Open a hoomd schema GSD file.
-* `read_log` - Read logged quantities into a dict of time-series arrays.
+* `read_log` - Read log from a hoomd schema GSD file into a dict of time-series
+  arrays.
 
 See Also:
     See :ref:`hoomd-examples` for full examples.
@@ -34,6 +31,7 @@ import json
 import logging
 import warnings
 from collections import OrderedDict
+from fnmatch import filter as fnfilter
 
 import numpy
 
@@ -54,19 +52,18 @@ logger = logging.getLogger('gsd.hoomd')
 class ConfigurationData:
     """Store configuration data.
 
-    Access via the `Frame.configuration` attribute.
+    Use the `Frame.configuration` attribute of a to access the configuration.
 
     Attributes:
         step (int): Time step of this frame (:chunk:`configuration/step`).
 
-        dimensions (int): Number of spatial dimensions
+        dimensions (int): Number of dimensions
             (:chunk:`configuration/dimensions`). When not set explicitly,
-            the value is inferred from `box`: if :math:`L_z = 0` the default
-            is 2, otherwise 3. User-set values always take precedence.
+            dimensions will default to different values based on the value of
+            :math:`L_z` in `box`. When :math:`L_z = 0` dimensions will default
+            to 2, otherwise 3. User set values always take precedence.
 
-        box ((6,) `numpy.ndarray` of ``numpy.float32``): Simulation box
-            parameters ``[lx, ly, lz, xy, xz, yz]``
-            (:chunk:`configuration/box`).
+
     """
 
     _default_value = OrderedDict()
@@ -98,7 +95,24 @@ class ConfigurationData:
             if self.dimensions is None:
                 self.dimensions = 2 if Lz == 0 else 3
 
-    def validate(self):
+    def cast(self):
+        """Lazy cast attributes to writeable dictionary.
+
+        Convert every array attribute to a `numpy.ndarray` of the proper
+        type and check that all attributes have the correct dimensions.
+
+        Ignore any attributes that are ``None``.
+
+        Returns:
+            castedDict (dict): Stored attributes by attribute string name.
+        """
+        castedDict = {}
+        if self.box is not None:
+            castedDict['box'] = numpy.ascontiguousarray(self.box, dtype=numpy.float32)
+            castedDict['box'] = castedDict['box'].reshape([6])
+        return castedDict
+
+    def validate(self, inplace=False):
         """Validate all attributes.
 
         Convert every array attribute to a `numpy.ndarray` of the proper
@@ -106,26 +120,32 @@ class ConfigurationData:
 
         Ignore any attributes that are ``None``.
 
+        Args:
+            inplace (bool): Whether or not the arrays are modified in place.
+
         Warning:
             Array attributes that are not contiguous numpy arrays will be
-            replaced with contiguous numpy arrays of the appropriate type.
+            replaced with contiguous numpy arrays of the appropriate type
+            if inplace is ``True``.
         """
-        logger.debug('Validating ConfigurationData')
-
-        if self.box is not None:
-            self.box = numpy.ascontiguousarray(self.box, dtype=numpy.float32)
-            self.box = self.box.reshape([6])
+        if inplace:
+            dataDict = self.cast()
+            if self.box is not None:
+                self.box = dataDict['box']
 
 
 class ParticleData:
-    """Store particle data chunks (SPH-extended).
+    """Store particle data chunks.
 
-    Access via the `Frame.particles` attribute.
+    Use the `Frame.particles` attribute of a to access the particles.
 
-    Instances resulting from file read operations always store array quantities
-    as `numpy.ndarray` objects of the types listed below. User-created frames
-    may supply any array-like that can be converted to the appropriate
-    `numpy.ndarray`.
+    Instances resulting from file read operations will always store array
+    quantities in `numpy.ndarray` objects of the defined types. User created
+    frames may provide input data that can be converted to a `numpy.ndarray`.
+
+    See Also:
+        `hoomd.State` for a full description of how HOOMD interprets this
+        data.
 
     Attributes:
         N (int): Number of particles in the frame (:chunk:`particles/N`).
@@ -136,41 +156,46 @@ class ParticleData:
         position ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
             Particle position (:chunk:`particles/position`).
 
+
         typeid ((*N*, ) `numpy.ndarray` of ``numpy.uint32``):
             Particle type id (:chunk:`particles/typeid`).
 
         mass ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
             Particle mass (:chunk:`particles/mass`).
 
+
+
         body ((*N*, ) `numpy.ndarray` of ``numpy.int32``):
             Particle body (:chunk:`particles/body`).
+
 
         velocity ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
             Particle velocity (:chunk:`particles/velocity`).
 
-        slength ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+        slength ((*N*, ) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Particle smoothing length (:chunk:`particles/slength`).
 
-        density ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+        density ((*N*, ) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Particle density (:chunk:`particles/density`).
 
-        pressure ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+        pressure ((*N*, ) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Particle pressure (:chunk:`particles/pressure`).
 
-        energy ((*N*, ) `numpy.ndarray` of ``numpy.float32``):
+        energy ((*N*, ) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Particle energy (:chunk:`particles/energy`).
 
-        auxiliary1 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+        auxiliary1 ((*N*, 3) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Auxiliary vector field 1 (:chunk:`particles/auxiliary1`).
 
-        auxiliary2 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+        auxiliary2 ((*N*, 3) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Auxiliary vector field 2 (:chunk:`particles/auxiliary2`).
 
-        auxiliary3 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+        auxiliary3 ((*N*, 3) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Auxiliary vector field 3 (:chunk:`particles/auxiliary3`).
 
-        auxiliary4 ((*N*, 3) `numpy.ndarray` of ``numpy.float32``):
+        auxiliary4 ((*N*, 3) `numpy.ndarray` of ``numpy.float32`` or ``numpy.float64``):
             Auxiliary vector field 4 (:chunk:`particles/auxiliary4`).
+
 
         image ((*N*, 3) `numpy.ndarray` of ``numpy.int32``):
             Particle image (:chunk:`particles/image`).
@@ -217,7 +242,100 @@ class ParticleData:
         self.image = None
         self.type_shapes = None
 
-    def validate(self):
+    def _validate_precision(self, data):
+        """Maintain floats in numpy arrays."""
+        outFloat = numpy.float32
+        if isinstance(data, list):
+            outFloat = numpy.float64
+        elif data.dtype == numpy.float64:
+            outFloat = numpy.float64
+        return outFloat
+
+    def cast(self):
+        """Lazy cast attributes to writeable dictionary.
+
+        Convert every array attribute to a `numpy.ndarray` of the proper
+        type and check that all attributes have the correct dimensions.
+
+        Ignore any attributes that are ``None``.
+
+        Returns:
+            castedDict (dict): Stored attributes by attribute string name.
+        """
+        castedDict = {}
+        if self.position is not None:
+            castedDict['position'] = numpy.ascontiguousarray(
+                self.position, dtype=self._validate_precision(self.position)
+            )
+            castedDict['position'] = castedDict['position'].reshape([self.N, 3])
+        if self.typeid is not None:
+            castedDict['typeid'] = numpy.ascontiguousarray(
+                self.typeid, dtype=numpy.uint32
+            )
+            castedDict['typeid'].reshape([self.N])
+        if self.mass is not None:
+            castedDict['mass'] = numpy.ascontiguousarray(
+                self.mass, dtype=self._validate_precision(self.mass)
+            )
+            castedDict['mass'] = castedDict['mass'].reshape([self.N])
+        if self.body is not None:
+            castedDict['body'] = numpy.ascontiguousarray(self.body, dtype=numpy.int32)
+            castedDict['body'] = castedDict['body'].reshape([self.N])
+        if self.velocity is not None:
+            castedDict['velocity'] = numpy.ascontiguousarray(
+                self.velocity, dtype=self._validate_precision(self.velocity)
+            )
+            castedDict['velocity'] = castedDict['velocity'].reshape([self.N, 3])
+        if self.slength is not None:
+            castedDict['slength'] = numpy.ascontiguousarray(
+                self.slength, dtype=self._validate_precision(self.slength)
+            )
+            castedDict['slength'] = castedDict['slength'].reshape([self.N])
+        if self.density is not None:
+            castedDict['density'] = numpy.ascontiguousarray(
+                self.density, dtype=self._validate_precision(self.density)
+            )
+            castedDict['density'] = castedDict['density'].reshape([self.N])
+        if self.pressure is not None:
+            castedDict['pressure'] = numpy.ascontiguousarray(
+                self.pressure, dtype=self._validate_precision(self.pressure)
+            )
+            castedDict['pressure'] = castedDict['pressure'].reshape([self.N])
+        if self.energy is not None:
+            castedDict['energy'] = numpy.ascontiguousarray(
+                self.energy, dtype=self._validate_precision(self.energy)
+            )
+            castedDict['energy'] = castedDict['energy'].reshape([self.N])
+        if self.auxiliary1 is not None:
+            castedDict['auxiliary1'] = numpy.ascontiguousarray(
+                self.auxiliary1, dtype=self._validate_precision(self.auxiliary1)
+            )
+            castedDict['auxiliary1'] = castedDict['auxiliary1'].reshape([self.N, 3])
+        if self.auxiliary2 is not None:
+            castedDict['auxiliary2'] = numpy.ascontiguousarray(
+                self.auxiliary2, dtype=self._validate_precision(self.auxiliary2)
+            )
+            castedDict['auxiliary2'] = castedDict['auxiliary2'].reshape([self.N, 3])
+        if self.auxiliary3 is not None:
+            castedDict['auxiliary3'] = numpy.ascontiguousarray(
+                self.auxiliary3, dtype=self._validate_precision(self.auxiliary3)
+            )
+            castedDict['auxiliary3'] = castedDict['auxiliary3'].reshape([self.N, 3])
+        if self.auxiliary4 is not None:
+            castedDict['auxiliary4'] = numpy.ascontiguousarray(
+                self.auxiliary4, dtype=self._validate_precision(self.auxiliary4)
+            )
+            castedDict['auxiliary4'] = castedDict['auxiliary4'].reshape([self.N, 3])
+        if self.image is not None:
+            castedDict['image'] = numpy.ascontiguousarray(self.image, dtype=numpy.int32)
+            castedDict['image'] = castedDict['image'].reshape([self.N, 3])
+
+        if self.types is not None and (not len(set(self.types)) == len(self.types)):
+            msg = 'Type names must be unique.'
+            raise ValueError(msg)
+        return castedDict
+
+    def validate(self, inplace=False):
         """Validate all attributes.
 
         Convert every array attribute to a `numpy.ndarray` of the proper
@@ -225,63 +343,48 @@ class ParticleData:
 
         Ignore any attributes that are ``None``.
 
+        Args:
+            inplace (bool): Whether or not the arrays are modified in place.
+
         Warning:
             Array attributes that are not contiguous numpy arrays will be
-            replaced with contiguous numpy arrays of the appropriate type.
+            replaced with contiguous numpy arrays of the appropriate type
+            if inplace is ``True``.
         """
-        logger.debug('Validating ParticleData')
+        if inplace:
+            dataDict = self.cast()
+            if self.position is not None:
+                self.position = dataDict['position']
+            if self.typeid is not None:
+                self.typeid = dataDict['typeid']
+            if self.mass is not None:
+                self.mass = dataDict['mass']
+            if self.body is not None:
+                self.body = dataDict['body']
+            if self.velocity is not None:
+                self.velocity = dataDict['velocity']
+            if self.slength is not None:
+                self.slength = dataDict['slength']
+            if self.density is not None:
+                self.density = dataDict['density']
+            if self.pressure is not None:
+                self.pressure = dataDict['pressure']
+            if self.energy is not None:
+                self.energy = dataDict['energy']
+            if self.auxiliary1 is not None:
+                self.auxiliary1 = dataDict['auxiliary1']
+            if self.auxiliary2 is not None:
+                self.auxiliary2 = dataDict['auxiliary2']
+            if self.auxiliary3 is not None:
+                self.auxiliary3 = dataDict['auxiliary3']
+            if self.auxiliary4 is not None:
+                self.auxiliary4 = dataDict['auxiliary4']
+            if self.image is not None:
+                self.image = dataDict['image']
 
-        if self.position is not None:
-            self.position = numpy.ascontiguousarray(self.position,
-                                                    dtype=numpy.float32)
-            self.position = self.position.reshape([self.N, 3])
-        if self.typeid is not None:
-            self.typeid = numpy.ascontiguousarray(self.typeid,
-                                                  dtype=numpy.uint32)
-            self.typeid = self.typeid.reshape([self.N])
-        if self.mass is not None:
-            self.mass = numpy.ascontiguousarray(self.mass, dtype=numpy.float32)
-            self.mass = self.mass.reshape([self.N])
-        if self.body is not None:
-            self.body = numpy.ascontiguousarray(self.body, dtype=numpy.int32)
-            self.body = self.body.reshape([self.N])
-        if self.velocity is not None:
-            self.velocity = numpy.ascontiguousarray(self.velocity,
-                                                    dtype=numpy.float32)
-            self.velocity = self.velocity.reshape([self.N, 3])
-        
-        if self.slength is not None:
-            self.slength = numpy.ascontiguousarray(self.slength, dtype=numpy.float32)
-            self.slength = self.slength.reshape([self.N])
-        if self.density is not None:
-            self.density = numpy.ascontiguousarray(self.density, dtype=numpy.float32)
-            self.density = self.density.reshape([self.N])
-        if self.pressure is not None:
-            self.pressure = numpy.ascontiguousarray(self.pressure, dtype=numpy.float32)
-            self.pressure = self.pressure.reshape([self.N])
-        if self.energy is not None:
-            self.energy = numpy.ascontiguousarray(self.energy, dtype=numpy.float32)
-            self.energy = self.energy.reshape([self.N])
-        if self.auxiliary1 is not None:
-            self.auxiliary1 = numpy.ascontiguousarray(self.auxiliary1, dtype=numpy.float32)
-            self.auxiliary1 = self.auxiliary1.reshape([self.N, 3])
-        if self.auxiliary2 is not None:
-            self.auxiliary2 = numpy.ascontiguousarray(self.auxiliary2, dtype=numpy.float32)
-            self.auxiliary2 = self.auxiliary2.reshape([self.N, 3])
-        if self.auxiliary3 is not None:
-            self.auxiliary3 = numpy.ascontiguousarray(self.auxiliary3, dtype=numpy.float32)
-            self.auxiliary3 = self.auxiliary3.reshape([self.N, 3])
-        if self.auxiliary4 is not None:
-            self.auxiliary4 = numpy.ascontiguousarray(self.auxiliary4, dtype=numpy.float32)
-            self.auxiliary4 = self.auxiliary4.reshape([self.N, 3])
-
-        if self.image is not None:
-            self.image = numpy.ascontiguousarray(self.image, dtype=numpy.int32)
-            self.image = self.image.reshape([self.N, 3])
-
-        if (self.types is not None
-                and (not len(set(self.types)) == len(self.types))):
-            raise ValueError("Type names must be unique.")
+        if self.types is not None and (not len(set(self.types)) == len(self.types)):
+            msg = 'Type names must be unique.'
+            raise ValueError(msg)
 
 
 class BondData:
@@ -346,9 +449,37 @@ class BondData:
         self._default_value['N'] = numpy.uint32(0)
         self._default_value['types'] = []
         self._default_value['typeid'] = numpy.uint32(0)
-        self._default_value['group'] = numpy.array([0] * M, dtype=numpy.int32)
+        self._default_value['group'] = numpy.array([0] * M, dtype=numpy.uint32)
 
-    def validate(self):
+    def cast(self):
+        """Lazy cast attributes to writeable dictionary.
+
+        Convert every array attribute to a `numpy.ndarray` of the proper
+        type and check that all attributes have the correct dimensions.
+
+        Ignore any attributes that are ``None``.
+
+        Returns:
+            castedDict (dict): Stored attributes by attribute string name.
+        """
+        castedDict = {}
+        if self.typeid is not None:
+            castedDict['typeid'] = numpy.ascontiguousarray(
+                self.typeid, dtype=numpy.uint32
+            )
+            castedDict['typeid'] = castedDict['typeid'].reshape([self.N])
+        if self.group is not None:
+            castedDict['group'] = numpy.ascontiguousarray(
+                self.group, dtype=numpy.uint32
+            )
+            castedDict['group'] = castedDict['group'].reshape([self.N, self.M])
+
+        if self.types is not None and (not len(set(self.types)) == len(self.types)):
+            msg = 'Type names must be unique.'
+            raise ValueError(msg)
+        return castedDict
+
+    def validate(self, inplace=False):
         """Validate all attributes.
 
         Convert every array attribute to a `numpy.ndarray` of the proper
@@ -356,18 +487,20 @@ class BondData:
 
         Ignore any attributes that are ``None``.
 
+        Args:
+            inplace (bool): Whether or not the arrays are modified in place.
+
         Warning:
             Array attributes that are not contiguous numpy arrays will be
-            replaced with contiguous numpy arrays of the appropriate type.
+            replaced with contiguous numpy arrays of the appropriate type
+            if inplace is ``True``.
         """
-        logger.debug('Validating BondData')
-
-        if self.typeid is not None:
-            self.typeid = numpy.ascontiguousarray(self.typeid, dtype=numpy.uint32)
-            self.typeid = self.typeid.reshape([self.N])
-        if self.group is not None:
-            self.group = numpy.ascontiguousarray(self.group, dtype=numpy.int32)
-            self.group = self.group.reshape([self.N, self.M])
+        if inplace:
+            dataDict = self.cast()
+            if self.typeid is not None:
+                self.typeid = dataDict['typeid']
+            if self.group is not None:
+                self.group = dataDict['group']
 
         if self.types is not None and (not len(set(self.types)) == len(self.types)):
             msg = 'Type names must be unique.'
@@ -407,9 +540,42 @@ class ConstraintData:
         self._default_value = OrderedDict()
         self._default_value['N'] = numpy.uint32(0)
         self._default_value['value'] = numpy.float32(0)
-        self._default_value['group'] = numpy.array([0] * self.M, dtype=numpy.int32)
+        self._default_value['group'] = numpy.array([0] * self.M, dtype=numpy.uint32)
 
-    def validate(self):
+    def _validate_precision(self, data):
+        """Maintain floats in numpy arrays."""
+        outFloat = numpy.float32
+        if isinstance(data, list):
+            outFloat = numpy.float64
+        elif data.dtype == numpy.float64:
+            outFloat = numpy.float64
+        return outFloat
+
+    def cast(self):
+        """Lazy cast attributes to writeable dictionary.
+
+        Convert every array attribute to a `numpy.ndarray` of the proper
+        type and check that all attributes have the correct dimensions.
+
+        Ignore any attributes that are ``None``.
+
+        Returns:
+            castedDict (dict): Stored attributes by attribute string name.
+        """
+        castedDict = {}
+        if self.value is not None:
+            castedDict['value'] = numpy.ascontiguousarray(
+                self.value, dtype=self._validate_precision(self.value)
+            )
+            castedDict['value'] = castedDict['value'].reshape([self.N])
+        if self.group is not None:
+            castedDict['group'] = numpy.ascontiguousarray(
+                self.group, dtype=numpy.uint32
+            )
+            castedDict['group'] = castedDict['group'].reshape([self.N, self.M])
+        return castedDict
+
+    def validate(self, inplace=False):
         """Validate all attributes.
 
         Convert every array attribute to a `numpy.ndarray` of the proper
@@ -417,41 +583,42 @@ class ConstraintData:
 
         Ignore any attributes that are ``None``.
 
+        Args:
+            inplace (bool): Whether or not the arrays are modified in place.
+
         Warning:
             Array attributes that are not contiguous numpy arrays will be
-            replaced with contiguous numpy arrays of the appropriate type.
+            replaced with contiguous numpy arrays of the appropriate type
+            if inplace is ``True``.
         """
-        logger.debug('Validating ConstraintData')
-
-        if self.value is not None:
-            self.value = numpy.ascontiguousarray(self.value, dtype=numpy.float32)
-            self.value = self.value.reshape([self.N])
-        if self.group is not None:
-            self.group = numpy.ascontiguousarray(self.group, dtype=numpy.int32)
-            self.group = self.group.reshape([self.N, self.M])
+        if inplace:
+            if self.value is not None:
+                self.value = numpy.ascontiguousarray(self.value, dtype=numpy.float32)
+                self.value = self.value.reshape([self.N])
+            if self.group is not None:
+                self.group = numpy.ascontiguousarray(self.group, dtype=numpy.uint32)
+                self.group = self.group.reshape([self.N, self.M])
 
 
 class Frame:
     """System state at one point in time.
 
     Attributes:
-        configuration (`ConfigurationData`): Simulation box and time step.
+        configuration (`ConfigurationData`): Configuration data.
 
-        particles (`ParticleData`): Per-particle fields (position, velocity,
-            SPH fields, etc.).
+        particles (`ParticleData`): Particles.
 
-        bonds (`BondData`): Bond topology (M=2).
+        bonds (`BondData`): Bonds.
 
-        pairs (`BondData`): Special pair topology (M=2).
+        pairs (`BondData`): Special pair.
 
         constraints (`ConstraintData`): Distance constraints.
 
         state (dict): In-memory scratch space for caller use. **Not written
             to disk.**
 
-        log (dict): Logged scalar or array quantities written to disk under
-            the ``log/`` namespace. Values must be `numpy.ndarray` or
-            array-like.
+        log (dict): Logged data (values must be `numpy.ndarray` or
+            `array_like`)
     """
 
     def __init__(self):
@@ -463,15 +630,22 @@ class Frame:
         self.state = {}
         self.log = {}
 
-    def validate(self):
-        """Validate all contained frame data."""
-        logger.debug('Validating Frame')
+    def validate(self, inplace=False):
+        """Validate all contained data.
 
-        self.configuration.validate()
-        self.particles.validate()
-        self.bonds.validate()
-        self.constraints.validate()
-        self.pairs.validate()
+        Args:
+            inplace (bool): Whether or not the arrays are modified in place.
+
+        Warning:
+            Array attributes that are not contiguous numpy arrays will be
+            replaced with contiguous numpy arrays of the appropriate type
+            if inplace is ``True``.
+        """
+        self.configuration.validate(inplace)
+        self.particles.validate(inplace)
+        self.bonds.validate(inplace)
+        self.constraints.validate(inplace)
+        self.pairs.validate(inplace)
 
 
 class _HOOMDTrajectoryIterable:
@@ -484,6 +658,8 @@ class _HOOMDTrajectoryIterable:
 
     def __next__(self):
         return self._trajectory[next(self._indices_iterator)]
+
+    next = __next__  # Python 2.7 compatibility
 
     def __iter__(self):
         return type(self)(self._trajectory, self._indices)
@@ -521,17 +697,23 @@ class HOOMDTrajectory:
 
     Args:
         file (`gsd.fl.GSDFile`): File to access.
+        precision (str): Precision to use for floats on write.
+        Can be `'single'` or `'double'`.
 
     Open hoomd GSD files with `open`.
     """
 
-    def __init__(self, file):
+    def __init__(self, file, precision='single'):
         if file.mode == 'ab':
             msg = 'Append mode not yet supported'
             raise ValueError(msg)
 
         self._file = file
         self._initial_frame = None
+        if precision not in ('single', 'double'):
+            message = "precision must be 'single' or 'double'"
+            raise ValueError(message)
+        self._precision = precision
 
         # Used to cache positive results when chunks exist in frame 0.
         self._chunk_exists_frame_0 = {}
@@ -542,7 +724,7 @@ class HOOMDTrajectory:
             raise RuntimeError('GSD file is not a hoomd schema file: ' + str(self.file))
         valid = False
         version = self.file.schema_version
-        if version < (2, 0) and version >= (1, 0):
+        if version < (3, 0) and version >= (1, 0):
             valid = True
         if not valid:
             raise RuntimeError(
@@ -552,12 +734,21 @@ class HOOMDTrajectory:
                 + str(self.file)
             )
 
+        if version < (2, 0) and precision == 'double':
+            message = "schema 1.x files are not compatible with precision='double'"
+            raise RuntimeError(message)
+
         logger.info('found ' + str(len(self)) + ' frames')
 
     @property
     def file(self):
         """:class:`gsd.fl.GSDFile`: The file handle."""
         return self._file
+
+    @property
+    def precision(self):
+        """:class:str: The object write precision."""
+        return self._precision
 
     def __len__(self):
         """The number of frames in the trajectory."""
@@ -576,27 +767,32 @@ class HOOMDTrajectory:
         frame. If it is the same, do not write it out as it can be instantiated
         either from the value at the initial frame or the default value.
         """
-        logger.debug('Appending frame to hoomd trajectory: ' + str(self.file))
-
-        frame.validate()
+        if isinstance(frame, Frame):
+            frame.validate()
 
         # want the initial frame specified as a reference to detect if chunks
         # need to be written
         if self._initial_frame is None and len(self) > 0:
             self._read_frame(0)
 
+        float_type = numpy.float64 if self.precision == 'double' else numpy.float32
+
         for path in [
-                'configuration',
-                'particles',
-                'bonds',
-                'constraints',
-                'pairs',
+            'configuration',
+            'particles',
+            'bonds',
+            'constraints',
+            'pairs',
         ]:
             container = getattr(frame, path)
+            dataDict = container.cast()
             for name in container._default_value:
                 if self._should_write(path, name, frame):
-                    logger.debug('writing data chunk: ' + path + '/' + name)
-                    data = getattr(container, name)
+                    data = dataDict.get(name, getattr(container, name))
+                    if isinstance(data, numpy.ndarray) and numpy.issubdtype(
+                        data.dtype, numpy.floating
+                    ):
+                        data = data.astype(float_type)
 
                     if name == 'N':
                         data = numpy.array([data], dtype=numpy.uint32)
@@ -613,15 +809,16 @@ class HOOMDTrajectory:
 
                     self.file.write_chunk(path + '/' + name, data)
 
-        # # write state data
-        # for state, data in frame.state.items():
-        #     self.file.write_chunk('state/' + state, data)
-
         # write log data
         for log, data in frame.log.items():
             self.file.write_chunk('log/' + log, data)
 
         self.file.end_frame()
+
+        # This implementation must be able to read back frame 0, flush it.
+        # Allow the user to control when other frames are flushed.
+        if len(self) == 0:
+            self.flush()
 
     def truncate(self):
         """Remove all frames from the file."""
@@ -655,9 +852,6 @@ class HOOMDTrajectory:
             initial_container = getattr(self._initial_frame, path)
             initial_data = getattr(initial_container, name)
             if numpy.array_equal(initial_data, data):
-                logger.debug(
-                    'skipping data chunk, matches frame 0: ' + path + '/' + name
-                )
                 return False
 
         matches_default_value = False
@@ -671,7 +865,6 @@ class HOOMDTrajectory:
         if matches_default_value and not self._chunk_exists_frame_0.get(
             path + '/' + name, False
         ):
-            logger.debug('skipping data chunk, default value: ' + path + '/' + name)
             return False
 
         return True
@@ -680,7 +873,7 @@ class HOOMDTrajectory:
         """Append each item of the iterable to the file.
 
         Args:
-            iterable: An iterable object the provides :py:class:`Frame`
+            iterable: An iterable object that provides :py:class:`Frame`
                 instances. This could be another HOOMDTrajectory, a generator
                 that modifies frames, or a list of frames.
         """
@@ -694,7 +887,7 @@ class HOOMDTrajectory:
             idx (int): Frame index to read.
 
         Returns:
-            `Frame` with the frame data
+            Frame : The frame data
 
         Replace any data chunks not present in the given frame with either data
         from frame 0, or initialize from default values if not in frame 0. Cache
@@ -703,8 +896,6 @@ class HOOMDTrajectory:
         """
         if idx >= len(self):
             raise IndexError
-
-        logger.debug('reading frame ' + str(idx) + ' from: ' + str(self.file))
 
         if self._initial_frame is None and idx != 0:
             self._read_frame(0)
@@ -755,10 +946,10 @@ class HOOMDTrajectory:
 
         # then read all groups that have N, types, etc...
         for path in [
-                'particles',
-                'bonds',
-                'constraints',
-                'pairs',
+            'particles',
+            'bonds',
+            'constraints',
+            'pairs',
         ]:
             container = getattr(frame, path)
             if self._initial_frame is not None:
@@ -841,7 +1032,6 @@ class HOOMDTrajectory:
 
                     container.__dict__[name].flags.writeable = False
 
-
         # read log data
         logged_data_names = self.file.find_matching_chunk_names('log/')
         for log in logged_data_names:
@@ -900,7 +1090,7 @@ class HOOMDTrajectory:
         self._file.flush()
 
 
-def open(name, mode='r'):  # noqa: A001 - allow shadowing builtin open
+def open(name, mode='r', precision='single'):  # noqa: A001 - allow shadowing builtin open
     """Open a hoomd schema GSD file.
 
     The return value of `open` can be used as a context manager.
@@ -908,6 +1098,8 @@ def open(name, mode='r'):  # noqa: A001 - allow shadowing builtin open
     Args:
         name (str): File name to open.
         mode (str): File open mode.
+        precision (str): Float precision to write when appending new frames. Can be
+          'single' or 'double'.
 
     Returns:
         `HOOMDTrajectory` instance that accesses the file **name** with the
@@ -949,22 +1141,25 @@ def open(name, mode='r'):  # noqa: A001 - allow shadowing builtin open
         mode=mode,
         application='gsd.hoomd ' + gsd.version.version,
         schema='hoomd',
-        schema_version=[1, 4],
+        schema_version=[2, 0],
     )
 
-    return HOOMDTrajectory(gsdfileobj)
+    return HOOMDTrajectory(gsdfileobj, precision=precision)
 
 
-def read_log(name, scalar_only=False):
+def read_log(name: str, scalar_only=False, glob_pattern='*'):
     """Read log from a hoomd schema GSD file into a dict of time-series arrays.
 
     Args:
         name (str): File name to open.
         scalar_only (bool): Set to `True` to include only scalar log values.
+        glob_pattern (bool):
+            Apply a globbing wildcard filter to the log keys before reading.
 
     The log data includes :chunk:`configuration/step` and all matching
     :chunk:`log/user_defined`, :chunk:`log/bonds/user_defined`, and
-    :chunk:`log/particles/user_defined` quantities in the file.
+    :chunk:`log/particles/user_defined` quantities in the file that
+    match the provided ``glob_pattern``.
 
     Returns:
         `dict`
@@ -987,6 +1182,7 @@ def read_log(name, scalar_only=False):
         df = pandas.DataFrame(gsd.hoomd.read_log('log-example.gsd',
                                                   scalar_only=True))
         df
+
     """
     if not fl_imported:
         msg = 'file layer module is not available'
@@ -1005,9 +1201,13 @@ def read_log(name, scalar_only=False):
         mode='r',
         application='gsd.hoomd ' + gsd.version.version,
         schema='hoomd',
-        schema_version=[1, 4],
+        schema_version=[2, 0],
     ) as gsdfileobj:
-        logged_data_names = gsdfileobj.find_matching_chunk_names('log/')
+        logged_data_names = (
+            fnfilter(gsdfileobj.find_matching_chunk_names('log/'), glob_pattern)
+            if glob_pattern != '*'
+            else gsdfileobj.find_matching_chunk_names('log/')
+        )
         # Always log timestep associated with each log entry
         logged_data_names.insert(0, 'configuration/step')
         if len(logged_data_names) == 1:
@@ -1015,7 +1215,7 @@ def read_log(name, scalar_only=False):
                 'No logged data in file: ' + str(name), RuntimeWarning, stacklevel=2
             )
 
-        logged_data_dict = dict()
+        logged_data_dict: dict[str, numpy.ndarray] = {}
         for log in logged_data_names:
             log_exists_frame_0 = gsdfileobj.chunk_exists(frame=0, name=log)
             is_configuration_step = log == 'configuration/step'
@@ -1030,7 +1230,7 @@ def read_log(name, scalar_only=False):
                     if isinstance(tmp, str):
                         tmp = numpy.array([tmp], dtype=numpy.dtypes.StringDType)
 
-                if scalar_only and not tmp.shape[0] == 1:
+                if scalar_only and tmp.shape[0] != 1:
                     continue
                 if tmp.shape[0] == 1:
                     logged_data_dict[log] = numpy.full(
@@ -1043,19 +1243,18 @@ def read_log(name, scalar_only=False):
                         tmp, (gsdfileobj.nframes, *tuple(1 for _ in tmp.shape))
                     )
 
-            for idx in range(1, gsdfileobj.nframes):
-                for key in logged_data_dict.keys():
-                    if not gsdfileobj.chunk_exists(frame=idx, name=key):
-                        continue
-                    data = gsdfileobj.read_chunk(frame=idx, name=key)
-                    if (
-                        not isinstance(
-                            logged_data_dict[key].dtype, numpy.dtypes.StringDType
-                        )
-                        and len(logged_data_dict[key][idx].shape) == 0
-                    ):
-                        logged_data_dict[key][idx] = data[0]
-                    else:
-                        logged_data_dict[key][idx] = data
+        for idx in range(1, gsdfileobj.nframes):
+            for key, item in logged_data_dict.items():
+                data = gsdfileobj.read_chunk(
+                    frame=idx if gsdfileobj.chunk_exists(frame=idx, name=key) else 0,
+                    name=key,
+                )
+                if (
+                    not isinstance(item.dtype, numpy.dtypes.StringDType)
+                    and len(item[idx].shape) == 0
+                ):
+                    item[idx] = data[0]
+                else:
+                    item[idx] = data
 
     return logged_data_dict

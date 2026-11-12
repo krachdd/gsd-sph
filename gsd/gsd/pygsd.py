@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 """GSD reader written in pure Python.
@@ -36,7 +36,7 @@ from collections import namedtuple
 
 import numpy
 
-version = '3.4.2'
+version = '5.0.1'
 
 logger = logging.getLogger('gsd.pygsd')
 

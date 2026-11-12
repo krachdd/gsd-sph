@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 """GSD file layer API.
@@ -249,6 +249,8 @@ cdef class GSDFile:
 
         nframes (int): Number of frames.
 
+        debug (bool): Whether to enable debug logging for the file. (Default ``True``)
+
     :py:class:`GSDFile` implements an object oriented class interface to the GSD
     file layer. Use :py:func:`open` to open a GSD file and obtain a
     :py:class:`GSDFile` instance. :py:class:`GSDFile` can be used as a context
@@ -272,26 +274,31 @@ cdef class GSDFile:
 
         nframes (int): Number of frames.
 
-        maximum_write_buffer_size (int): The Maximum write buffer size (bytes).
+        debug (bool): Whether to enable debug logging for the file.
 
-        index_entries_to_buffer (int): Number of index entries to buffer before
-            flushing.
+        maximum_write_buffer_size (int): The Maximum write buffer size (bytes).
     """
 
     cdef libgsd.gsd_handle __handle
     cdef bint __is_open
+    cdef bint debug
     cdef str mode
     cdef str name
+
 
     def __init__(self,
                  name,
                  mode,
                  application,
                  schema,
-                 schema_version):
+                 schema_version,
+                 debug=True):
         cdef libgsd.gsd_open_flag c_flags
         cdef int exclusive_create = 0
         cdef int overwrite = 0
+
+        #: bool: Enable or disable debug mode for logging.
+        self.debug = debug
 
         self.mode = mode
 
@@ -376,6 +383,7 @@ cdef class GSDFile:
 
         self.__is_open = True
 
+
     def close(self):
         """close()
 
@@ -457,6 +465,10 @@ cdef class GSDFile:
         future calls to :py:meth:`write_chunk()` will write to the **next**
         frame in the file.
 
+        :py:meth:`end_frame()` does NOT write frames to the underlying file.
+        Complete frames will be available to read from the file 1) after the
+        file is closed or 2) after a call to :py:meth:`flush()` completes.
+
         .. danger::
             Call :py:meth:`end_frame()` to complete the current frame
             **before** closing the file. If you fail to call
@@ -481,6 +493,7 @@ cdef class GSDFile:
                               data=numpy.array([13,14],
                                                dtype=numpy.float32))
                 f.end_frame()
+                f.flush()
                 f.nframes
                 f.close()
 
@@ -489,7 +502,8 @@ cdef class GSDFile:
         if not self.__is_open:
             raise ValueError("File is not open")
 
-        logger.debug('end frame: ' + self.name)
+        if self.debug:
+            logger.debug('end frame: ' + self.name)
 
         with nogil:
             retval = libgsd.gsd_end_frame(&self.__handle)
@@ -550,6 +564,7 @@ cdef class GSDFile:
                               data=numpy.array([70,80,90],
                                                dtype=numpy.int64))
                 f.end_frame()
+                f.flush()
                 f.nframes
                 f.close()
         """
@@ -581,8 +596,6 @@ cdef class GSDFile:
             if data_array is not data:
                 logger.warning('implicit data copy when writing chunk: ' + name)
             data_array = data_array.view()
-
-
 
             if len(data_array.shape) > 2:
                 raise ValueError("GSD can only write 1 or 2 dimensional arrays: "
@@ -627,9 +640,10 @@ cdef class GSDFile:
             else:
                 raise ValueError("invalid type for chunk: " + name)
 
-        # Once we have the data pointer, the behavior should be identical
-        # for all data types
-        logger.debug('write chunk: ' + self.name + ' - ' + name)
+        if self.debug:
+            # Once we have the data pointer, the behavior should be identical
+            # for all data types
+            logger.debug('write chunk: ' + self.name + ' - ' + name)
 
         cdef char * c_name
         name_e = name.encode('utf-8')
@@ -696,8 +710,6 @@ cdef class GSDFile:
         c_name = name_e
         cdef int64_t c_frame
         c_frame = frame
-
-        logger.debug('chunk exists: ' + self.name + ' - ' + name)
 
         with nogil:
             index_entry = libgsd.gsd_find_chunk(&self.__handle, c_frame, c_name)
@@ -812,8 +824,9 @@ cdef class GSDFile:
         else:
             raise ValueError("invalid type for chunk: " + name)
 
-        logger.debug('read chunk: ' + self.name + ' - '
-                     + str(frame) + ' - ' + name)
+        if self.debug:
+            logger.debug('read chunk: ' + self.name + ' - '
+                         + str(frame) + ' - ' + name)
 
         # only read chunk if we have data
         if index_entry.N != 0 and index_entry.M != 0:
@@ -1005,20 +1018,6 @@ cdef class GSDFile:
                 raise ValueError("File is not open")
 
             retval = libgsd.gsd_set_maximum_write_buffer_size(&self.__handle, size)
-            __raise_on_error(retval, self.name)
-
-    property index_entries_to_buffer:
-        def __get__(self):
-            if not self.__is_open:
-                raise ValueError("File is not open")
-
-            return libgsd.gsd_get_index_entries_to_buffer(&self.__handle)
-
-        def __set__(self, number):
-            if not self.__is_open:
-                raise ValueError("File is not open")
-
-            retval = libgsd.gsd_set_index_entries_to_buffer(&self.__handle, number)
             __raise_on_error(retval, self.name)
 
     def __dealloc__(self):

@@ -52,7 +52,7 @@
 }
 
 \title{\textbf{GSD-SPH: Extended GSD File Format for SPH Simulations}\\[4pt]
-       \large Module Documentation \quad \texttt{gsd-sph} v3.4.2}
+       \large Module Documentation \quad \texttt{gsd-sph} v5.0.1}
 \author{David Krach\\[2pt]
         Institute of Applied Mechanics (MIB), University of Stuttgart\\
         \href{mailto:david.krach@mib.uni-stuttgart.de}%
@@ -67,7 +67,7 @@
 \section{Overview}
 
 \texttt{gsd-sph} is a specialised fork of the
-\href{https://github.com/glotzerlab/gsd}{GSD library (v3.4.2)} developed by
+\href{https://github.com/glotzerlab/gsd}{GSD library (v5.0.1)} developed by
 the Glotzer Group at the University of Michigan.  It extends the HOOMD schema
 with the particle fields required by the Smoothed Particle Hydrodynamics (SPH)
 solver implemented in \texttt{hoomd-sph3}.
@@ -297,7 +297,7 @@ The C extension (\texttt{gsd.fl}) must be compiled before use.  The required
 conda environment is defined in the parent \texttt{hoomd-sph3} repository.
 
 \begin{lstlisting}[style=bash]
-cd gsd-3.4.2
+cd gsd-5.0.1
 mkdir build && cd build
 cmake ..
 make
