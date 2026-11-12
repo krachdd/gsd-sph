@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 import datetime
@@ -17,6 +16,7 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
     'sphinx_copybutton',
+    'sphinx_inline_tabs',
 ]
 
 if os.getenv('READTHEDOCS'):
@@ -40,7 +40,7 @@ master_doc = 'index'
 
 project = 'GSD'
 year = datetime.date.today().year
-copyright = f'2016-{ year } The Regents of the University of Michigan'
+copyright = f'2016-{year} The Regents of the University of Michigan'
 
 version = gsd.version.version
 release = version

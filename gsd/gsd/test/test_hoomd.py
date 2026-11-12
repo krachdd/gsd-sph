@@ -217,8 +217,11 @@ def make_nondefault_frame():
     return frame0
 
 
-def assert_frames_equal(s, frame0, check_position=True, check_step=True):
+def assert_frames_equal(
+    s, frame0, check_position=True, check_step=True, precision='single'
+):
     """Assert that two frames are equal."""
+    dtype = numpy.float32 if precision == 'single' else numpy.float64
     if check_step:
         assert s.configuration.step == frame0.configuration.step
 
@@ -228,21 +231,52 @@ def assert_frames_equal(s, frame0, check_position=True, check_step=True):
     assert s.particles.types == frame0.particles.types
     assert s.particles.type_shapes == frame0.particles.type_shapes
     numpy.testing.assert_array_equal(s.particles.typeid, frame0.particles.typeid)
-    numpy.testing.assert_array_equal(s.particles.mass, frame0.particles.mass)
+    numpy.testing.assert_array_equal(
+        s.particles.mass.astype(dtype),
+        numpy.asarray(frame0.particles.mass).astype(dtype),
+    )
     numpy.testing.assert_array_equal(s.particles.body, frame0.particles.body)
     if check_position:
         numpy.testing.assert_array_equal(
-            s.particles.position, frame0.particles.position
-        )
-    numpy.testing.assert_array_equal(s.particles.velocity, frame0.particles.velocity)
-    numpy.testing.assert_array_equal(s.particles.slength, frame0.particles.slength)
-    numpy.testing.assert_array_equal(s.particles.density, frame0.particles.density)
-    numpy.testing.assert_array_equal(s.particles.pressure, frame0.particles.pressure)
-    numpy.testing.assert_array_equal(s.particles.energy, frame0.particles.energy)
-    numpy.testing.assert_array_equal(s.particles.auxiliary1, frame0.particles.auxiliary1)
-    numpy.testing.assert_array_equal(s.particles.auxiliary2, frame0.particles.auxiliary2)
-    numpy.testing.assert_array_equal(s.particles.auxiliary3, frame0.particles.auxiliary3)
-    numpy.testing.assert_array_equal(s.particles.auxiliary4, frame0.particles.auxiliary4)
+        s.particles.position.astype(dtype),
+        numpy.asarray(frame0.particles.position).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.velocity.astype(dtype),
+        numpy.asarray(frame0.particles.velocity).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.slength.astype(dtype),
+        numpy.asarray(frame0.particles.slength).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.density.astype(dtype),
+        numpy.asarray(frame0.particles.density).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.pressure.astype(dtype),
+        numpy.asarray(frame0.particles.pressure).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.energy.astype(dtype),
+        numpy.asarray(frame0.particles.energy).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.auxiliary1.astype(dtype),
+        numpy.asarray(frame0.particles.auxiliary1).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.auxiliary2.astype(dtype),
+        numpy.asarray(frame0.particles.auxiliary2).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.auxiliary3.astype(dtype),
+        numpy.asarray(frame0.particles.auxiliary3).astype(dtype),
+    )
+    numpy.testing.assert_array_equal(
+        s.particles.auxiliary4.astype(dtype),
+        numpy.asarray(frame0.particles.auxiliary4).astype(dtype),
+    )
     numpy.testing.assert_array_equal(s.particles.image, frame0.particles.image)
 
     assert s.bonds.N == frame0.bonds.N
@@ -251,7 +285,9 @@ def assert_frames_equal(s, frame0, check_position=True, check_step=True):
     numpy.testing.assert_array_equal(s.bonds.group, frame0.bonds.group)
 
     assert s.constraints.N == frame0.constraints.N
-    numpy.testing.assert_array_equal(s.constraints.value, frame0.constraints.value)
+    numpy.testing.assert_array_equal(
+        s.constraints.value, numpy.asarray(frame0.constraints.value).astype(dtype)
+    )
     numpy.testing.assert_array_equal(s.constraints.group, frame0.constraints.group)
 
     assert s.pairs.N == frame0.pairs.N
@@ -260,8 +296,10 @@ def assert_frames_equal(s, frame0, check_position=True, check_step=True):
     numpy.testing.assert_array_equal(s.pairs.group, frame0.pairs.group)
 
 
-def test_fallback(tmp_path, open_mode):
+@pytest.mark.parametrize('precision', ['single', 'double'])
+def test_fallback(tmp_path, open_mode, precision):
     """Test that properties fall back to defaults when the N changes."""
+    floatType = numpy.float32 if precision == 'single' else numpy.float64
     frame0 = make_nondefault_frame()
 
     frame1 = gsd.hoomd.Frame()
@@ -283,7 +321,7 @@ def test_fallback(tmp_path, open_mode):
     frame2.pairs.N = 7
 
     with gsd.hoomd.open(
-        name=tmp_path / 'test_fallback.gsd', mode=open_mode.write
+        name=tmp_path / 'test_fallback.gsd', mode=open_mode.write, precision=precision
     ) as hf:
         hf.extend([frame0, frame1, frame2])
 
@@ -291,14 +329,14 @@ def test_fallback(tmp_path, open_mode):
         assert len(hf) == 3
         s = hf[0]
 
-        assert_frames_equal(s, frame0)
+        assert_frames_equal(s, frame0, precision=precision)
         assert 'value' in s.log
         numpy.testing.assert_array_equal(s.log['value'], frame0.log['value'])
 
         # test that everything but position remained the same in frame 1
         s = hf[1]
 
-        assert_frames_equal(s, frame0, check_position=False)
+        assert_frames_equal(s, frame0, check_position=False, precision=precision)
         assert 'value' in s.log
         numpy.testing.assert_array_equal(s.log['value'], frame0.log['value'])
 
@@ -313,46 +351,46 @@ def test_fallback(tmp_path, open_mode):
             s.particles.typeid, numpy.array([0, 0, 0], dtype=numpy.uint32)
         )
         numpy.testing.assert_array_equal(
-            s.particles.mass, numpy.array([1, 1, 1], dtype=numpy.float32)
+            s.particles.mass, numpy.array([1, 1, 1], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
             s.particles.body, numpy.array([-1, -1, -1], dtype=numpy.int32)
         )
         numpy.testing.assert_array_equal(
             s.particles.position,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
             s.particles.velocity,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
-            s.particles.slength, numpy.array([1, 1, 1], dtype=numpy.float32)
+            s.particles.slength, numpy.array([1, 1, 1], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
-            s.particles.density, numpy.array([0, 0, 0], dtype=numpy.float32)
+            s.particles.density, numpy.array([0, 0, 0], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
-            s.particles.pressure, numpy.array([0, 0, 0], dtype=numpy.float32)
+            s.particles.pressure, numpy.array([0, 0, 0], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
-            s.particles.energy, numpy.array([0, 0, 0], dtype=numpy.float32)
+            s.particles.energy, numpy.array([0, 0, 0], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
             s.particles.auxiliary1,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
             s.particles.auxiliary2,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
             s.particles.auxiliary3,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
             s.particles.auxiliary4,
-            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float32),
+            numpy.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=floatType),
         )
         numpy.testing.assert_array_equal(
             s.particles.image,
@@ -370,7 +408,7 @@ def test_fallback(tmp_path, open_mode):
 
         assert s.constraints.N == 4
         numpy.testing.assert_array_equal(
-            s.constraints.value, numpy.array([0, 0, 0, 0], dtype=numpy.float32)
+            s.constraints.value, numpy.array([0, 0, 0, 0], dtype=floatType)
         )
         numpy.testing.assert_array_equal(
             s.constraints.group,
@@ -402,7 +440,7 @@ def test_fallback_to_frame0(tmp_path, open_mode):
     frame1.pairs.N = None
 
     with gsd.hoomd.open(
-        name=tmp_path / 'test_fallback2.gsd', mode=open_mode.write
+        name=tmp_path / 'test_fallback2.gsd', mode=open_mode.write, precision='double'
     ) as hf:
         hf.extend([frame0, frame1])
 
@@ -413,7 +451,7 @@ def test_fallback_to_frame0(tmp_path, open_mode):
 
         s = hf[1]
         assert s.configuration.step == frame1.configuration.step
-        assert_frames_equal(s, frame0, check_step=False)
+        assert_frames_equal(s, frame0, check_step=False, precision='double')
         assert 'value' in s.log
         numpy.testing.assert_array_equal(s.log['value'], frame0.log['value'])
 
@@ -608,6 +646,7 @@ def test_truncate(tmp_path):
     """Test the truncate API."""
     with gsd.hoomd.open(name=tmp_path / 'test_iteration.gsd', mode='w') as hf:
         hf.extend(create_frame(i) for i in range(20))
+        hf.flush()
 
         assert len(hf) == 20
         s = hf[10]  # noqa
@@ -819,7 +858,9 @@ def test_read_log_warning(tmp_path):
 def test_initial_frame_copy(tmp_path, open_mode):
     """Ensure that the user does not unintentionally modify _initial_frame."""
     with gsd.hoomd.open(
-        name=tmp_path / 'test_initial_frame_copy.gsd', mode=open_mode.write
+        name=tmp_path / 'test_initial_frame_copy.gsd',
+        mode=open_mode.write,
+        precision='double',
     ) as hf:
         frame = make_nondefault_frame()
 
@@ -895,3 +936,135 @@ def test_initial_frame_copy(tmp_path, open_mode):
         for key in frame_1.log.keys():
             assert frame_1.log[key] is initial.log[key]
             assert not frame_1.log[key].flags.writeable
+
+
+def test_float64(tmp_path, open_mode):
+    """Test that SPH fields can be optionally stored as float32 or float64."""
+    frame = gsd.hoomd.Frame()
+    frame.particles.N = 4
+    density32 = numpy.array([-0.1, 0.1 / 3, 0.1 / 3, 0.1 / 3], dtype=numpy.float32)
+    density64 = numpy.array([-0.1, 0.1 / 3, 0.1 / 3, 0.1 / 3], dtype=numpy.float64)
+    frame.particles.density = density64
+    numpy.testing.assert_array_equal(frame.particles.density, density64)
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'test_defaults.gsd', mode=open_mode.write, precision='double'
+    ) as hf:
+        hf.append(frame)
+
+    with gsd.hoomd.open(name=tmp_path / 'test_defaults.gsd', mode=open_mode.read) as hf:
+        s = hf[0]
+
+        numpy.testing.assert_array_equal(s.particles.density, density64)
+        numpy.testing.assert_raises(
+            AssertionError,
+            numpy.testing.assert_array_equal,
+            s.particles.density,
+            density32,
+        )
+
+
+def test_precision(tmp_path, open_mode):
+    """Test that single and double precision files can be stored."""
+    frame = gsd.hoomd.Frame()
+    frame.particles.N = 4
+    pressure32 = numpy.array([-0.1, 0.1 / 3, 0.1 / 3, 0.1 / 3], dtype=numpy.float32)
+    pressure64 = numpy.array([-0.1, 0.1 / 3, 0.1 / 3, 0.1 / 3], dtype=numpy.float64)
+    frame.particles.pressure = pressure64
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'double.gsd', mode=open_mode.write, precision='double'
+    ) as hf:
+        hf.append(frame)
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'single.gsd', mode=open_mode.write, precision='single'
+    ) as hf:
+        hf.append(frame)
+
+    with gsd.hoomd.open(name=tmp_path / 'double.gsd', mode=open_mode.read) as hf:
+        numpy.testing.assert_array_equal(hf[0].particles.pressure, pressure64)
+
+    with gsd.hoomd.open(name=tmp_path / 'single.gsd', mode=open_mode.read) as hf:
+        numpy.testing.assert_array_equal(hf[0].particles.pressure, pressure32)
+
+
+SPH_FLOAT_FIELDS = [
+    'position',
+    'velocity',
+    'mass',
+    'slength',
+    'density',
+    'pressure',
+    'energy',
+    'auxiliary1',
+    'auxiliary2',
+    'auxiliary3',
+    'auxiliary4',
+]
+
+
+def test_all_precision(tmp_path, open_mode):
+    """Test both single and double precision for all SPH float fields."""
+    frame0 = make_nondefault_frame()
+    for name in SPH_FLOAT_FIELDS:
+        setattr(
+            frame0.particles,
+            name,
+            numpy.asarray(getattr(frame0.particles, name), dtype=numpy.float64) + 0.1,
+        )
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'double.gsd', mode=open_mode.write, precision='double'
+    ) as hf:
+        hf.append(frame0)
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'single.gsd', mode=open_mode.write, precision='single'
+    ) as hf:
+        hf.append(frame0)
+
+    with gsd.hoomd.open(
+        name=tmp_path / 'double.gsd', mode=open_mode.read, precision='double'
+    ) as hf:
+        s = hf[0]
+        for name in SPH_FLOAT_FIELDS:
+            numpy.testing.assert_array_equal(
+                getattr(frame0.particles, name), getattr(s.particles, name)
+            )
+            assert getattr(s.particles, name).dtype == numpy.float64
+
+    with gsd.hoomd.open(name=tmp_path / 'single.gsd', mode=open_mode.read) as hf:
+        s = hf[0]
+        for name in SPH_FLOAT_FIELDS:
+            numpy.testing.assert_array_equal(
+                numpy.ascontiguousarray(
+                    getattr(frame0.particles, name), dtype=numpy.float32
+                ),
+                getattr(s.particles, name),
+            )
+            assert getattr(s.particles, name).dtype == numpy.float32
+
+
+def test_write_multiple_precision(tmp_path):
+    """Test single, then double precision writing on the same frame."""
+    frame = gsd.hoomd.Frame()
+    frame.particles.N = 1
+    frame.particles.auxiliary1 = numpy.array([[0.1, 0.2, 0.3]], dtype=numpy.float64)
+    with gsd.hoomd.open(name=tmp_path / 'single.gsd', mode='w', precision='single') as hf:
+        hf.append(frame)
+    with gsd.hoomd.open(name=tmp_path / 'double.gsd', mode='w', precision='double') as hf:
+        hf.append(frame)
+
+    with gsd.hoomd.open(name=tmp_path / 'single.gsd', mode='r') as hf:
+        s = hf[0]
+        numpy.testing.assert_array_equal(
+            numpy.array([[0.1, 0.2, 0.3]], dtype=numpy.float32), s.particles.auxiliary1
+        )
+        assert s.particles.auxiliary1.dtype == numpy.float32
+    with gsd.hoomd.open(name=tmp_path / 'double.gsd', mode='r') as hf:
+        s = hf[0]
+        numpy.testing.assert_array_equal(
+            numpy.array([[0.1, 0.2, 0.3]], dtype=numpy.float64), s.particles.auxiliary1
+        )
+        assert s.particles.auxiliary1.dtype == numpy.float64

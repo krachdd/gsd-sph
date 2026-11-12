@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2024 The Regents of the University of Michigan
+# Copyright (c) 2016-2026 The Regents of the University of Michigan
 # Part of GSD, released under the BSD 2-Clause License.
 
 from libc.stdint cimport uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t,\
@@ -128,5 +128,3 @@ cdef extern from "gsd.h" nogil:
     int gsd_upgrade(gsd_handle *handle)
     uint64_t gsd_get_maximum_write_buffer_size(gsd_handle* handle)
     int gsd_set_maximum_write_buffer_size(gsd_handle* handle, uint64_t size)
-    uint64_t gsd_get_index_entries_to_buffer(gsd_handle* handle)
-    int gsd_set_index_entries_to_buffer(gsd_handle* handle, uint64_t number)

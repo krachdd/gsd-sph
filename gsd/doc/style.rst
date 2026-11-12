@@ -1,4 +1,4 @@
-.. Copyright (c) 2016-2024 The Regents of the University of Michigan
+.. Copyright (c) 2016-2026 The Regents of the University of Michigan
 .. Part of GSD, released under the BSD 2-Clause License.
 
 Code style
@@ -7,13 +7,12 @@ Code style
 All code in GSD must follow a consistent style to ensure readability. We provide configuration files
 for linters (specified below) so that developers can automatically validate and format files.
 
-These tools are configured for use with `pre-commit`_ in ``.pre-commit-config.yaml``. You can
-install pre-commit hooks to validate your code. Checks will run on pull requests. Run checks
-manually with::
+These tools are configured for use with `prek`_ and checks will run on pull requests.
+Run checks manually with::
 
-    pre-commit run --all-files
+    prek run --all-files
 
-.. _pre-commit: https://pre-commit.com/
+.. _prek: https://prek.j178.dev/
 
 Python
 ------
@@ -39,9 +38,6 @@ Tools
 
 * Autoformatter: `yapf <https://github.com/google/yapf>`_
 
-  * Run: ``pre-commit run --all-files`` to apply style changes to the whole
-    repository.
-
 Documentation
 ^^^^^^^^^^^^^
 
@@ -54,7 +50,7 @@ Python code should be documented with docstrings and added to the Sphinx documen
 C
 ---
 
-* Style is set by clang-format=11
+* Style is set by clang-format
 
   * Whitesmith's indentation style.
   * 100 character line width.

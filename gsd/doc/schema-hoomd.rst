@@ -1,4 +1,4 @@
-.. Copyright (c) 2016-2024 The Regents of the University of Michigan
+.. Copyright (c) 2016-2026 The Regents of the University of Michigan
 .. Part of GSD, released under the BSD 2-Clause License.
 
 HOOMD Schema
@@ -14,12 +14,20 @@ chunks. Any newer reader will initialize new data chunks with default values
 when they are not present in an older version file.
 
 :Schema name: ``hoomd``
-:Schema version: 1.4
+:Schema version: 2.0
 
 .. seealso::
 
     `hoomd.State` for a full description of how HOOMD interprets this
     data.
+
+Changes
+-------
+
+Version 2.0
+^^^^^^^^^^^
+
+* Each ``float`` data chunk in 2.0 schema files may be either *float32* or *float64*.
 
 Use-cases
 ---------
@@ -138,7 +146,7 @@ Configuration
 
 .. chunk:: configuration/box
 
-    :Type: float
+    :Type: float32 *or* float64
     :Size: 6x1
     :Default: [1,1,1,0,0,0]
     :Units: *varies*
@@ -149,6 +157,8 @@ Configuration
 
     * ``box[0:3]``: :math:`(l_x, l_y, l_z)` the box length in each direction, in length units
     * ``box[3:]``: :math:`(xy, xz, yz)` the tilt factors, dimensionless values
+
+    .. versionchanged:: 2.0
 
 
 Particle data
@@ -208,30 +218,36 @@ Attributes
 
 .. chunk:: particles/mass
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx1
     :Default: 1.0
     :Units: mass
 
     Store the mass of each particle.
 
+    .. versionchanged:: 2.0
+
 .. chunk:: particles/charge
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx1
     :Default: 0.0
     :Units: charge
 
     Store the charge of each particle.
 
+    .. versionchanged:: 2.0
+
 .. chunk:: particles/diameter
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx1
     :Default: 1.0
     :Units: length
 
     Store the diameter of each particle.
+
+    .. versionchanged:: 2.0
 
 .. chunk:: particles/body
 
@@ -246,7 +262,7 @@ Attributes
 
 .. chunk:: particles/moment_inertia
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx3
     :Default: 0,0,0
     :Units: mass * length^2
@@ -255,12 +271,14 @@ Attributes
     This inertia tensor is diagonal in the body frame of the particle. The
     default value is for point particles.
 
+    .. versionchanged:: 2.0
+
 Properties
 ^^^^^^^^^^
 
 .. chunk:: particles/position
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx3
     :Default: 0,0,0
     :Units: length
@@ -281,9 +299,11 @@ Properties
     Where :math:`l_x`, :math:`l_y`, :math:`l_z`, :math:`xy`, :math:`xz`, and :math:`yz` are the
     simulation box parameters (:chunk:`configuration/box`).
 
+    .. versionchanged:: 2.0
+
 .. chunk:: particles/orientation
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx4
     :Default: 1,0,0,0
     :Units: unit quaternion
@@ -293,27 +313,33 @@ Properties
     where the quaternion is :math:`q = r + a_xi + a_yj + a_zk`. A unit
     quaternion has the property: :math:`\sqrt{r^2 + a_x^2 + a_y^2 + a_z^2} = 1`.
 
+    .. versionchanged:: 2.0
+
 Momenta
 ^^^^^^^^
 
 .. chunk:: particles/velocity
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx3
     :Default: 0,0,0
     :Units: length/time
 
     Store the velocity of each particle :math:`(v_x, v_y, v_z)`.
 
+    .. versionchanged:: 2.0
+
 .. chunk:: particles/angmom
 
-    :Type: float (32-bit)
+    :Type: float32 *or* float64
     :Size: Nx4
     :Default: 0,0,0,0
     :Units: quaternion
 
     Store the angular momentum of each particle as a quaternion. See the HOOMD
     documentation for information on how to convert to a vector representation.
+
+    .. versionchanged:: 2.0
 
 .. chunk:: particles/image
 
@@ -509,13 +535,15 @@ Topology
 
 .. chunk:: constraints/value
 
-    :Type: float
+    :Type: float32 *or* float64
     :Size: Nx1
     :Default: 0
     :Units: length
 
     Store the distance of each constraint. Each constraint defines a fixed
     distance between two particles.
+
+    .. versionchanged:: 2.0
 
 .. chunk:: constraints/group
 
@@ -645,248 +673,5 @@ Name                                                       Type   Size      Unit
 State data
 ------------
 
-HOOMD stores auxiliary state information in ``state/*`` data chunks. Auxiliary
-state encompasses internal state to any integrator, updater, or other class that
-is not part of the particle system state but is also not a fixed parameter. For
-example, the internal degrees of freedom in integrator. Auxiliary state is
-useful when restarting simulations.
-
-HOOMD only stores state in GSD files when requested explicitly by the user. Only
-a few of the documented state data chunks will be present in any GSD file and
-not all state chunks are valid. Thus, state data chunks do not have default
-values. If a chunk is not present in the file, that state does not have a
-well-defined value.
-
-.. note::
-
-    HOOMD-blue >= v3.0.0 do not write state data.
-
-========================================================== ====== ========= ================
-Name                                                       Type   Size      Units
-========================================================== ====== ========= ================
-**HPMC integrator state**
-:chunk:`state/hpmc/integrate/d`                            double 1x1       length
-:chunk:`state/hpmc/integrate/a`                            double 1x1       number
-:chunk:`state/hpmc/sphere/radius`                          float  NTx1      length
-:chunk:`state/hpmc/sphere/orientable`                      uint8  NTx1      boolean
-:chunk:`state/hpmc/ellipsoid/a`                            float  NTx1      length
-:chunk:`state/hpmc/ellipsoid/b`                            float  NTx1      length
-:chunk:`state/hpmc/ellipsoid/c`                            float  NTx1      length
-:chunk:`state/hpmc/convex_polyhedron/N`                    uint32 NTx1      number
-:chunk:`state/hpmc/convex_polyhedron/vertices`             float  sum(N)x3  length
-:chunk:`state/hpmc/convex_spheropolyhedron/N`              uint32 NTx1      number
-:chunk:`state/hpmc/convex_spheropolyhedron/vertices`       float  sum(N)x3  length
-:chunk:`state/hpmc/convex_spheropolyhedron/sweep_radius`   float  NTx1      length
-:chunk:`state/hpmc/convex_polygon/N`                       uint32 NTx1      number
-:chunk:`state/hpmc/convex_polygon/vertices`                float  sum(N)x2  length
-:chunk:`state/hpmc/convex_spheropolygon/N`                 uint32 NTx1      number
-:chunk:`state/hpmc/convex_spheropolygon/vertices`          float  sum(N)x2  length
-:chunk:`state/hpmc/convex_spheropolygon/sweep_radius`      float  NTx1      length
-:chunk:`state/hpmc/simple_polygon/N`                       uint32 NTx1      number
-:chunk:`state/hpmc/simple_polygon/vertices`                float  sum(N)x2  length
-========================================================== ====== ========= ================
-
-HPMC integrator state
-^^^^^^^^^^^^^^^^^^^^^
-
-*NT* is the number of particle types.
-
-.. chunk:: state/hpmc/integrate/d
-
-    :Type: double
-    :Size: 1x1
-    :Units: length
-
-    *d* is the maximum trial move displacement.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/integrate/a
-
-    :Type: double
-    :Size: 1x1
-    :Units: number
-
-    *a* is the size of the maximum rotation move.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/sphere/radius
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Sphere radius for each particle type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/sphere/orientable
-
-        :Type: uint8
-        :Size: NTx1
-        :Units: boolean
-
-    Orientable flag for each particle type.
-
-    .. versionadded:: 1.3
-
-.. chunk:: state/hpmc/ellipsoid/a
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Size of the first ellipsoid semi-axis for each particle type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/ellipsoid/b
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Size of the second ellipsoid semi-axis for each particle type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/ellipsoid/c
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Size of the third ellipsoid semi-axis for each particle type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_polyhedron/N
-
-    :Type: uint32
-    :Size: NTx1
-    :Units: number
-
-    Number of vertices defined for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_polyhedron/vertices
-
-    :Type: float
-    :Size: sum(N)x3
-    :Units: length
-
-    Position of the vertices in the shape for all types. The shape for type 0 is
-    the first N[0] vertices, the shape for type 1 is the next N[1] vertices, and
-    so on...
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolyhedron/N
-
-    :Type: uint32
-    :Size: NTx1
-    :Units: number
-
-    Number of vertices defined for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolyhedron/vertices
-
-    :Type: float
-    :Size: sum(N)x3
-    :Units: length
-
-    Position of the vertices in the shape for all types. The shape for type 0 is
-    the first N[0] vertices, the shape for type 1 is the next N[1] vertices, and
-    so on...
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolyhedron/sweep_radius
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Sweep radius for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_polygon/N
-
-    :Type: uint32
-    :Size: NTx1
-    :Units: number
-
-    Number of vertices defined for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_polygon/vertices
-
-    :Type: float
-    :Size: sum(N)x2
-    :Units: length
-
-    Position of the vertices in the shape for all types. The shape for type 0 is
-    the first N[0] vertices, the shape for type 1 is the next N[1] vertices, and
-    so on...
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolygon/N
-
-    :Type: uint32
-    :Size: NTx1
-    :Units: number
-
-    Number of vertices defined for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolygon/vertices
-
-    :Type: float
-    :Size: sum(N)x2
-    :Units: length
-
-    Position of the vertices in the shape for all types. The shape for type 0 is
-    the first N[0] vertices, the shape for type 1 is the next N[1] vertices, and
-    so on...
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/convex_spheropolygon/sweep_radius
-
-    :Type: float
-    :Size: NTx1
-    :Units: length
-
-    Sweep radius for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/simple_polygon/N
-
-    :Type: uint32
-    :Size: NTx1
-    :Units: number
-
-    Number of vertices defined for each type.
-
-    .. versionadded:: 1.2
-
-.. chunk:: state/hpmc/simple_polygon/vertices
-
-    :Type: float
-    :Size: sum(N)x2
-    :Units: length
-
-    Position of the vertices in the shape for all types. The shape for type 0 is
-    the first N[0] vertices, the shape for type 1 is the next N[1] vertices, and
-    so on...
-
-    .. versionadded:: 1.2
+.. versionremoved:: 2.0
+   ``state/*`` data chunks do not exist in schema versions 2.0 and newer.
